@@ -91,6 +91,15 @@ Tratar esto como base ya construida salvo que el código o las pruebas demuestre
 - popup con botón único, informe de campos llenados y omitidos;
 - pruebas de contrato en Node sin dependencias.
 
+### Entrega 2 — Validación en navegador real
+
+- cliente mínimo del protocolo de Chrome (CDP) sobre el `WebSocket` nativo de Node, sin dependencias (`tests/navegador/cdp.mjs`);
+- cuatro formularios que reproducen cómo están construidos los portales colombianos: con `<label for>`, con el rótulo en un `div` hermano, con `autocomplete` estándar, y uno embebido en `iframe`;
+- el autorrelleno se ejecuta en un Chromium real y se verifica qué quedó escrito en cada campo, incluidas las trampas que nunca debe tocar;
+- compuerta `navegador` en POSTULA CI; con `POSTULA_EXIGIR_NAVEGADOR=1` la ausencia de navegador es falla, no omisión.
+
+Primer fallo real que encontró esta entrega: la exclusión amplia de la palabra «donde» descartaba rótulos legítimos como «Ciudad donde resides». Corregido y blindado con casos nuevos en `tests/matcher-contract.mjs`.
+
 ### Pendiente (ver sección 9)
 
 Tablero, Radar de vacantes por correo, Recetas por portal y Redactor.
@@ -137,7 +146,14 @@ Candados vigentes:
 - `tests/envio-contract.mjs` — el código no hace clic en botones de envío ni llama `form.submit()`.
 - `tests/perfil-contract.mjs` — el esquema de perfil es estable, validable y su exportación es reversible.
 - `tests/matcher-contract.mjs` — el reconocimiento acierta en los campos típicos de portales colombianos y **nunca** reconoce contraseñas, pagos ni búsqueda.
+- `tests/navegador-contract.mjs` — el autorrelleno se comporta bien en un Chromium real sobre formularios construidos como los de los portales colombianos.
 - `tests/proyecto-contract.mjs` — `AGENTS.md`, `README.md` y el manifiesto conservan su estructura obligatoria; ningún archivo del repositorio contiene datos personales reales.
+
+### Compuertas de POSTULA CI
+
+- `contratos` — sintaxis de todos los archivos, manifiesto válido, los candados de Node y la ausencia de dependencias;
+- `navegador` — el autorrelleno sobre formularios reales en un Chromium del runner;
+- `validate` — agregado de las dos anteriores; es la compuerta obligatoria.
 
 Ejecutar todo:
 
@@ -145,7 +161,7 @@ Ejecutar todo:
 npm test
 ```
 
-No requiere `npm install`: las pruebas corren con Node puro.
+No requiere `npm install`: las pruebas corren con Node puro. La prueba de navegador se omite sola si el equipo no tiene Chromium, para no bloquear a nadie; en CI se exige.
 
 ### Contrato de README por entrega
 
@@ -219,7 +235,7 @@ Salvo que el usuario repriorice explícitamente:
 
 Cuando no haya PR abierto ni pedido explícito del usuario, continuar en este orden después de verificar que el código no lo haya hecho ya:
 
-1. **Endurecer el reconocimiento de campos** con casos reales encontrados al postularse. Cada campo que falle en un portal real se convierte en un caso de `tests/matcher-contract.mjs`.
+1. **Endurecer el reconocimiento de campos** con casos reales encontrados al postularse. Cada campo que falle en un portal real se convierte en un caso de `tests/matcher-contract.mjs` y, si depende del DOM, en un formulario nuevo bajo `tests/navegador/`.
 2. **Tablero de postulaciones** — registro local de a qué se postuló, fecha, estado, respuesta y próximo seguimiento. Sin servidor.
 3. **Radar de vacantes** — lectura de las alertas de empleo que los portales envían al correo del usuario, para armar la lista diaria ya filtrada. Sin scraping: el usuario activa las alertas y POSTULA solo lee su propio buzón, con su autorización.
 4. **Recetas por portal** — ajustes específicos para formularios difíciles, cuando el motor genérico no alcance.
@@ -252,6 +268,7 @@ extension/          la extensión completa, cargable tal cual en el navegador
   content/          código que se inyecta en la página del portal
   iconos/           iconos de la extensión
 tests/              pruebas de contrato en Node, sin dependencias
+  navegador/        cliente CDP y formularios que imitan portales reales
 AGENTS.md           este archivo
 README.md           foto de la última entrega únicamente
 ```

@@ -29,6 +29,7 @@ node tests/matcher-contract.mjs
 | `matcher-contract.mjs` | que el reconocimiento acierte, y sobre todo que **nunca** toque contraseñas, medios de pago, buscadores ni datos de terceros |
 | `perfil-contract.mjs` | que el esquema del perfil sea estable y que exportar/importar sea reversible |
 | `autofill-contract.mjs` | de dónde sale cada valor, los respaldos y la elección en listas desplegables |
+| `navegador-contract.mjs` | el comportamiento real sobre el DOM: que el autorrelleno escriba lo correcto en formularios construidos como los de los portales colombianos, y que no toque las trampas |
 | `proyecto-contract.mjs` | la estructura de `AGENTS.md` y `README.md`, que la extensión cargue sin compilar, que matcher y perfil no se desincronicen, y que **no haya datos personales reales en el repositorio** |
 
 ## Cómo se prueba código de navegador sin navegador
@@ -37,7 +38,30 @@ Los archivos de `extension/` se escriben como scripts clásicos que se cuelgan d
 
 Ventaja: se prueba exactamente el archivo que se publica, sin compilación y sin dependencias.
 
-Lo que depende del DOM (recorrer el formulario, leer etiquetas, escribir valores) no se prueba aquí. Eso se valida en uso real.
+## Pruebas en un navegador real
+
+Lo que depende del DOM sí se prueba, en un Chromium de verdad.
+
+`tests/navegador/cdp.mjs` es un cliente mínimo del protocolo de Chrome construido sobre el `WebSocket` nativo de Node 22. Por eso las pruebas de navegador **tampoco necesitan dependencias**: nada de Playwright ni Puppeteer.
+
+Los formularios de `tests/navegador/` reproducen las tres formas reales de construir un formulario de postulación:
+
+| Archivo | Qué reproduce |
+|---|---|
+| `portal-clasico.html` | `<label for>` explícito, `name` en español, selects, asterisco de obligatorio |
+| `portal-sin-labels.html` | el rótulo vive en un `div` hermano o solo hay `placeholder` |
+| `portal-moderno.html` | `autocomplete` estándar, campos ocultos, deshabilitados y de solo lectura, e `iframe` |
+| `portal-marco.html` | el contenido del `iframe` anterior |
+
+Cada formulario incluye **trampas**: contraseña, usuario, tarjeta de crédito, CVV, buscador de vacantes, nombre de la empresa, contacto de emergencia y salario ofrecido. La prueba verifica que todas queden vacías.
+
+```bash
+node tests/navegador-contract.mjs
+```
+
+Si el equipo no tiene Chromium, la prueba se omite y no falla. En CI se exige con `POSTULA_EXIGIR_NAVEGADOR=1`, para que la compuerta nunca se salte en silencio.
+
+Esta prueba ya demostró su valor: en su primera corrida encontró que la exclusión de la palabra «donde» —puesta para el buscador de vacantes— estaba descartando rótulos legítimos como «Ciudad donde resides».
 
 ## Lenguaje de estado
 

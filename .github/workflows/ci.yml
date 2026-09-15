@@ -60,9 +60,37 @@ jobs:
         if: always()
         run: echo "- Resultado: \`${{ job.status }}\`" >> "$GITHUB_STEP_SUMMARY"
 
+  navegador:
+    name: navegador
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Navegador disponible en el runner
+        run: |
+          for binario in /usr/bin/google-chrome-stable /usr/bin/google-chrome /usr/bin/chromium-browser /usr/bin/chromium; do
+            if [ -x "$binario" ]; then
+              echo "POSTULA_CHROME=$binario" >> "$GITHUB_ENV"
+              echo "Navegador: $binario"
+              exit 0
+            fi
+          done
+          echo "No hay navegador en el runner; se instala chromium."
+          sudo apt-get update -qq && sudo apt-get install -y -qq chromium-browser || sudo apt-get install -y -qq chromium
+          echo "POSTULA_CHROME=$(command -v chromium-browser || command -v chromium)" >> "$GITHUB_ENV"
+
+      - name: Autorrelleno sobre formularios reales
+        env:
+          POSTULA_EXIGIR_NAVEGADOR: '1'
+        run: node tests/navegador-contract.mjs
+
   validate:
     name: validate
-    needs: [contratos]
+    needs: [contratos, navegador]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -70,6 +98,10 @@ jobs:
         run: |
           if [ "${{ needs.contratos.result }}" != "success" ]; then
             echo "La compuerta «contratos» no pasó."
+            exit 1
+          fi
+          if [ "${{ needs.navegador.result }}" != "success" ]; then
+            echo "La compuerta «navegador» no pasó."
             exit 1
           fi
           echo "Todas las compuertas de POSTULA CI pasaron."

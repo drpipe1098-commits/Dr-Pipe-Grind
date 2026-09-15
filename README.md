@@ -4,64 +4,42 @@ Este README es una **foto operativa de la entrega actual únicamente**. El conte
 
 ## Qué se hizo
 
-**Entrega 1 — Perfil Único y Autorrelleno Universal.** Arranque del proyecto: extensión de navegador (Chrome, Edge, Brave, Opera) que llena el formulario de cualquier portal de empleo con los datos que la persona escribió una sola vez.
+**Entrega 2 — Validación del autorrelleno en un navegador real.**
 
-- Esquema de perfil con 31 campos en 5 grupos más experiencia laboral e idiomas como listas repetibles.
-- Motor de reconocimiento que puntúa etiqueta, `placeholder`, `name`, `id`, `autocomplete`, `type` y el texto cercano; las frases largas ganan sobre las cortas, y cada campo tiene lista de veta para no escribir los datos del usuario donde van los de otro.
-- Descarte duro y prioritario de contraseñas, medios de pago, captcha, buscadores y formularios de acceso.
-- Relleno de `input`, `textarea` y `select` disparando `input` y `change`, para que los portales hechos en React, Vue o Angular registren el valor.
-- Página de Perfil que se dibuja sola desde el esquema, con guardado local, copia descargable e importación.
-- Popup con un botón, informe de campos llenados y omitidos, y marcado en color sobre la página.
-- 6 candados de contrato en Node puro, sin dependencias ni compilación.
+La Entrega 1 dejó el motor probado sin DOM: se sabía que el reconocimiento de campos acertaba, pero no que el relleno funcionara sobre una página de verdad. Esta entrega cierra ese hueco.
 
-Decisiones que quedan blindadas por pruebas: **POSTULA nunca envía el formulario** y **los datos nunca salen del computador de la persona**.
+- Cliente mínimo del protocolo de Chrome (CDP) construido sobre el `WebSocket` nativo de Node 22: las pruebas de navegador **no agregan ninguna dependencia** al proyecto, ni Playwright ni Puppeteer.
+- Cuatro formularios que reproducen las tres formas reales de construir una postulación en los portales colombianos: con `<label for>` explícito, con el rótulo en un `div` hermano, con `autocomplete` estándar, y uno embebido en `iframe`.
+- Cada formulario lleva trampas —contraseña, usuario, tarjeta de crédito, CVV, buscador de vacantes, nombre de la empresa, contacto de emergencia y salario ofrecido— y la prueba exige que todas queden vacías.
+- Compuerta `navegador` en POSTULA CI. Con `POSTULA_EXIGIR_NAVEGADOR=1` la ausencia de navegador es falla, no omisión: la compuerta no se puede saltar en silencio.
+
+**Fallo real que encontró esta entrega en su primera corrida:** la palabra «donde», excluida por pertenecer al buscador de vacantes, estaba descartando rótulos legítimos como «Ciudad donde resides». Ahora solo excluye cuando es el rótulo completo, y quedó blindado con casos nuevos.
 
 ## Archivos modificados en esta entrega
 
-- `.github/workflows/ci.yml` — POSTULA CI: sintaxis, manifiesto, candados y compuerta `validate`.
-- `.github/workflows/readme-deploy-snapshot.yml` — rechaza el PR si este README no coincide con el diff.
-- `.gitignore` — impide subir hojas de vida, perfiles exportados y documentos personales.
-- `AGENTS.md` — arranque canónico del proyecto; contexto durable completo.
+- `.github/workflows/ci.yml` — compuerta `navegador` y su agregación en `validate`.
+- `AGENTS.md` — estado de la Entrega 2, topología de compuertas y mapa del repositorio.
 - `README.md` — esta foto de entrega.
-- `docs/INSTALACION.md` — instalación y uso para alguien sin conocimientos técnicos.
-- `docs/MATCHER.md` — cómo funciona el reconocimiento y cómo agregar patrones.
-- `docs/PERFIL.md` — esquema de datos del perfil y cómo extenderlo.
-- `docs/TESTING.md` — filosofía de candados, comandos y lenguaje de estado.
-- `extension/_locales/es/messages.json` — textos localizados de la extensión.
-- `extension/content/autofill.js` — motor de autorrelleno; garantiza no enviar el formulario.
-- `extension/content/matcher.js` — reconocimiento de campos por puntaje, con exclusiones y vetas.
-- `extension/estilos.css` — estilos compartidos del popup y la página de Perfil.
-- `extension/iconos/icono-128.png` — icono 128 px.
-- `extension/iconos/icono-16.png` — icono 16 px.
-- `extension/iconos/icono-32.png` — icono 32 px.
-- `extension/iconos/icono-48.png` — icono 48 px.
-- `extension/lib/normalizar.js` — normalización de texto sin tildes para comparar rótulos.
-- `extension/lib/perfil.js` — esquema, saneado y validación del Perfil Único.
-- `extension/manifest.json` — Manifest V3 con solo `storage`, `activeTab` y `scripting`.
-- `extension/opciones.html` — página de Perfil.
-- `extension/opciones.js` — dibujado, guardado, copia e importación del perfil.
-- `extension/popup.html` — popup de la extensión.
-- `extension/popup.js` — inyección bajo demanda e informe del resultado.
-- `package.json` — `npm test` sin dependencias.
-- `scripts/generar-iconos.py` — genera los PNG del icono sin librerías externas.
-- `tests/autofill-contract.mjs` — valores, respaldos y elección en listas desplegables.
-- `tests/ayuda.mjs` — carga los archivos de la extensión en un sandbox de `vm`.
-- `tests/envio-contract.mjs` — candado: nunca enviar el formulario.
-- `tests/matcher-contract.mjs` — 74 casos, incluidos los que nunca se deben tocar.
-- `tests/perfil-contract.mjs` — esquema estable y copia reversible.
-- `tests/privacidad-contract.mjs` — candado: sin red, sin nube, sin permisos de más.
-- `tests/proyecto-contract.mjs` — estructura del repositorio y cero datos personales.
-- `tests/run.mjs` — corredor de candados.
+- `docs/TESTING.md` — cómo funcionan las pruebas de navegador y qué reproduce cada formulario.
+- `extension/content/matcher.js` — «donde» pasa de exclusión amplia a exclusión exacta.
+- `tests/matcher-contract.mjs` — tres casos nuevos que blindan la corrección anterior.
+- `tests/navegador-contract.mjs` — candado de comportamiento sobre el DOM en un Chromium real.
+- `tests/navegador/cdp.mjs` — cliente del protocolo de Chrome sin dependencias.
+- `tests/navegador/portal-clasico.html` — formulario con `<label for>`, selects y trampas de acceso.
+- `tests/navegador/portal-marco.html` — contenido del `iframe`.
+- `tests/navegador/portal-moderno.html` — `autocomplete`, campos ocultos, deshabilitados y de solo lectura.
+- `tests/navegador/portal-sin-labels.html` — rótulos en `div` hermano y datos de terceros como trampa.
+- `tests/proyecto-contract.mjs` — el número de ejemplo de las pruebas de navegador entra en la lista permitida.
 
 ## Validación
 
-- **VALIDADO EN CÓDIGO** localmente: los 6 candados pasan (`npm test`), 74 casos de reconocimiento incluidos.
-- Pendiente de las compuertas del PR: **POSTULA CI / validate** y **README Deploy Snapshot / verificar**.
-- **NO está validado en uso real.** Nadie ha instalado la extensión ni ha rellenado un formulario de un portal verdadero. CI verde significa *validado en código*, no que Computrabajo aceptó una postulación.
-- El comportamiento sobre el DOM real (recorrer formularios, leer etiquetas, escribir valores) solo se puede comprobar instalando la extensión.
+- **VALIDADO EN CÓDIGO** localmente: los **7 candados** pasan (`npm test`), con 77 casos de reconocimiento y 3 formularios ejecutados en un Chromium real.
+- Las tres rutas de la compuerta de navegador quedaron comprobadas a mano: pasa con navegador, se omite sin navegador, y falla sin navegador cuando `POSTULA_EXIGIR_NAVEGADOR=1`.
+- Pendiente de las compuertas del PR: **POSTULA CI / validate**.
+- **NO está validado en uso real.** Los formularios de prueba imitan a los portales colombianos, pero no son ellos. Computrabajo, elempleo y Magneto365 no son alcanzables desde el entorno de desarrollo, así que la primera postulación verdadera sigue siendo la prueba que falta.
 
 ## Qué sigue
 
-1. **Instalar y probar en portales reales** siguiendo `docs/INSTALACION.md`: Computrabajo, elempleo, Magneto365 y LinkedIn. Cada campo que falle se convierte en un caso de `tests/matcher-contract.mjs`.
+1. **Instalar la extensión y postularse de verdad** siguiendo `docs/INSTALACION.md`. Cada campo que falle en un portal real se convierte en un caso de `tests/matcher-contract.mjs`, o en un formulario nuevo bajo `tests/navegador/` si depende del DOM.
 2. **Tablero de postulaciones** — registro local de a qué se postuló, fecha, estado y próximo seguimiento. Sin servidor.
 3. **Radar de vacantes** — lectura de las alertas de empleo que los portales mandan al correo, para armar la lista diaria ya filtrada.

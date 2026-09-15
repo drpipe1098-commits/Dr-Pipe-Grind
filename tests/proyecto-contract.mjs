@@ -112,7 +112,8 @@ todos
       `${archivo} contiene un correo personal real: usa @ejemplo.com en los ejemplos`);
     // Cédulas y celulares colombianos: rachas de 8 a 10 dígitos.
     // Solo se permite el número de ejemplo que usan las pruebas.
-    const EJEMPLOS = ['3001234567'];
+    // Números de ejemplo evidentemente ficticios, usados por las pruebas.
+    const EJEMPLOS = ['3001234567', '1234567890'];
     const numeros = (texto.match(/\d{8,10}/g) || []).filter((n) => !EJEMPLOS.includes(n));
     c.exigir(numeros.length === 0,
       `${archivo} contiene lo que parece una cédula o un celular real (${numeros[0]}): `

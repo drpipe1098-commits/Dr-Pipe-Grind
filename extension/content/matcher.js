@@ -30,7 +30,7 @@
     'otp', 'codigo sms',
     // búsqueda y ruido del portal
     'buscar', 'busqueda', 'search', 'palabra clave', 'keyword',
-    'que empleo', 'donde', 'filtrar', 'cupon', 'promocional'
+    'que empleo', 'filtrar', 'cupon', 'promocional'
   ];
 
   /**
@@ -38,7 +38,9 @@
    * es un campo de acceso; pero «github.com/usuario» aparece como ejemplo
    * dentro de un placeholder y no debe descartar el campo.
    */
-  const EXCLUSIONES_EXACTAS = ['usuario', 'user', 'clave', 'pin', 'codigo', 'token', 'id'];
+  const EXCLUSIONES_EXACTAS = [
+    'usuario', 'user', 'clave', 'pin', 'codigo', 'token', 'id', 'donde', 'where'
+  ];
 
   /** autocomplete estándar del navegador: la pista más confiable que existe. */
   const AUTOCOMPLETE = {
