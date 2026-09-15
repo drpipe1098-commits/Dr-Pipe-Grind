@@ -8,7 +8,7 @@ Este README es una **foto operativa de la entrega actual únicamente**. El conte
 
 Hasta ahora POSTULA rellenaba formularios, pero la persona tenía que escribir su perfil a mano campo por campo, y decidía a qué postularse leyendo avisos uno por uno. Esta entrega cierra los dos extremos con dos herramientas de terminal que corren con `node`, sin instalar nada.
 
-- **Extractor de texto de PDF sin dependencias.** Node ya trae `zlib`, que es lo único necesario. Entiende las fuentes simples de un byte (Word, LibreOffice, imprimir desde el navegador) y las fuentes compuestas subsetadas con `/ToUnicode` (WeasyPrint, Canva, Chrome), donde los bytes del contenido son identificadores de glifo y sin el mapa de la fuente el texto es ilegible. Cuando el PDF no tiene capa de texto, lo dice y se detiene.
+- **Extractor de texto de PDF sin dependencias.** Node ya trae `zlib`, que es lo único necesario. Entiende las fuentes simples de un byte (Word, LibreOffice, imprimir desde el navegador) y las compuestas subsetadas con `/ToUnicode` (WeasyPrint, Canva, Chrome), donde los bytes son identificadores de glifo y sin el mapa de la fuente el texto es ilegible. Si el PDF no tiene capa de texto, lo dice y se detiene.
 - **Hoja de vida → Perfil Único.** Reconoce identidad, contacto, ubicación, titular, resumen, la experiencia laboral completa, educación, idiomas, habilidades y certificaciones, y **calcula** los años de experiencia sin contar dos veces los periodos solapados. Escribe el JSON que se importa desde la página de Perfil.
 - **Filtros y puntaje de vacantes.** Descarta por salario, modalidad, inglés hablado y trabajo en terreno; puntúa de 0 a 100 contra la hoja de vida, en el equipo y sin red, mostrando las palabras concretas que produjeron cada puntaje. Revisión interactiva en la terminal, ordenada por compatibilidad.
 - **Dos campos nuevos en el perfil**, `habilidades` y `certificaciones`, con sus patrones en el matcher: las secciones de la hoja de vida que antes no tenían dónde caer.
@@ -25,7 +25,7 @@ Hasta ahora POSTULA rellenaba formularios, pero la persona tenía que escribir s
 Y dos más, fuera del código de producto:
 
 - Los patrones `hv-*` y `hoja-de-vida*` de `.gitignore`, pensados para que nadie suba su hoja de vida, estaban dejando fuera del repositorio tres archivos fuente de esta misma entrega. Quedó anclado y con su propio candado.
-- **POSTULA CI nunca había arrancado.** Un paso con `run: echo "- Resultado: ..."` mete un `: ` dentro de un escalar YAML sin comillas; el archivo entero deja de parsearse y GitHub responde con un fallo de arranque y cero jobs, que no se parece a una prueba en rojo. Venía así desde que se escribió el workflow, y los disparadores además apuntaban a una rama `main` que no existe en el remoto. Ambas cosas corregidas, con un candado que reproduce el fallo.
+- **POSTULA CI nunca había arrancado.** Un paso con `run: echo "- Resultado: ..."` mete un `: ` dentro de un escalar YAML sin comillas: el archivo deja de parsearse y GitHub responde con fallo de arranque y cero jobs, que no se parece a una prueba en rojo. Venía así desde que se escribió, y los disparadores además apuntaban a una rama `main` que no existe. Corregido, con un candado que reproduce el fallo.
 
 ## Archivos modificados en esta entrega
 
@@ -42,10 +42,10 @@ Y dos más, fuera del código de producto:
 - `herramientas/ejemplo-vacantes.txt` — formato del archivo de vacantes, con datos ficticios.
 - `herramientas/lib/pdf-texto.mjs` — extractor de texto de PDF sin dependencias.
 - `herramientas/lib/hoja-de-vida.mjs` — texto de hoja de vida → perfil, sin inventar campos.
-- `herramientas/lib/esquema.mjs` — puente al esquema de `extension/lib/perfil.js`, para que exista una sola definición del perfil.
-- `herramientas/lib/criterios.mjs` — salario colombiano, modalidad, inglés hablado y trabajo en terreno.
+- `herramientas/lib/esquema.mjs` — puente al esquema de `extension/lib/perfil.js`: una sola definición del perfil.
+- `herramientas/lib/criterios.mjs` — salario colombiano, modalidad, inglés hablado, trabajo en terreno.
 - `herramientas/lib/puntaje.mjs` — compatibilidad de 0 a 100, explicable y sin red.
-- `herramientas/lib/vacantes.mjs` — lectura de la lista en texto o en JSON.
+- `herramientas/lib/vacantes.mjs` — lectura de la lista en texto o JSON.
 - `tests/envio-contract.mjs` — el candado de no envío ahora cubre las herramientas de terminal.
 - `tests/pdf-contract.mjs` — candado del extractor sobre las cuatro formas reales de escribir un PDF.
 - `tests/hoja-de-vida-contract.mjs` — candado de «nunca inventar», con los cuatro fallos de arriba como casos.
@@ -59,8 +59,8 @@ Y dos más, fuera del código de producto:
 - **VALIDADO EN CÓDIGO** localmente: los **10 candados** pasan (`npm test`), con los 3 nuevos sumando la extracción de PDF en sus cuatro formas, el reconocimiento de hoja de vida y los filtros de vacantes.
 - El extractor y el reconocedor se probaron además contra **una hoja de vida real en PDF** generada por WeasyPrint, fuera del repositorio: 2 páginas, 16 campos reconocidos, 4 cargos con sus fechas y funciones correctas, y 14 campos correctamente vacíos por no estar en el documento. Los cuatro fallos listados arriba salieron de esa corrida.
 - Los filtros se probaron contra un archivo de vacantes ficticias: de 5 avisos, descartó el que exige inglés B2 conversacional y el presencial de bajo salario con trabajo en terreno, y dejó pasar el que solo pide inglés técnico de lectura.
-- **POSTULA CI corrió por primera vez en la historia del proyecto** y quedó en verde: `contratos`, `navegador` y `validate`, más `README Deploy Snapshot`. Antes de esta entrega el workflow ni siquiera arrancaba.
-- La compuerta `navegador` falló en su primera corrida real y resultó ser **intermitente**: la misma commit dio rojo por `push` y verde por `pull_request`. El navegador ahora usa perfil propio y puerto asignado por el sistema, y un fallo explica por qué.
+- **POSTULA CI corrió por primera vez** y quedó verde: `contratos`, `navegador`, `validate` y `README Deploy Snapshot`. Antes ni arrancaba.
+- La compuerta `navegador` resultó **intermitente**: la misma commit dio rojo por `push` y verde por `pull_request`. Ahora usa perfil propio y puerto del sistema.
 - **NO está validado en uso real.** El perfil generado todavía no se ha importado en un navegador ni se ha usado para postularse en un portal real.
 
 ## Qué sigue
