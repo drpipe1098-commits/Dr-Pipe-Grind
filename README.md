@@ -52,6 +52,7 @@ Y dos más, fuera del código de producto:
 - `tests/vacantes-contract.mjs` — candado de filtros y puntaje.
 - `tests/proyecto-contract.mjs` — dos candados nuevos: ningún archivo de código puede quedar tapado por `.gitignore`, y los workflows tienen que poder parsearse.
 - `tests/pdf/constructor.mjs` — constructor de PDF de prueba en memoria; el repositorio no admite archivos PDF.
+- `tests/navegador/cdp.mjs` — el navegador se lanza con perfil propio y puerto asignado por el sistema, y un fallo ahora explica por qué.
 
 ## Validación
 
