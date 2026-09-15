@@ -6,43 +6,45 @@ Este README es una **foto operativa de la entrega actual únicamente**. El conte
 
 **Entrega 3 — De la hoja de vida al perfil, y de la vacante al puntaje.**
 
-Hasta ahora POSTULA rellenaba formularios, pero la persona tenía que escribir su perfil a mano campo por campo, y decidía a qué postularse leyendo avisos uno por uno. Esta entrega cierra los dos extremos con dos herramientas de terminal que corren con `node`, sin instalar nada.
+POSTULA rellenaba formularios, pero el perfil se escribía a mano campo por campo y se decidía a qué postularse leyendo avisos uno por uno. Esta entrega cierra los dos extremos con dos herramientas de terminal que corren con `node`, sin instalar nada.
 
-- **Extractor de texto de PDF sin dependencias.** Node ya trae `zlib`, que es lo único necesario. Entiende las fuentes simples de un byte (Word, LibreOffice, imprimir desde el navegador) y las compuestas subsetadas con `/ToUnicode` (WeasyPrint, Canva, Chrome), donde los bytes son identificadores de glifo y sin el mapa de la fuente el texto es ilegible. Si el PDF no tiene capa de texto, lo dice y se detiene.
-- **Hoja de vida → Perfil Único.** Reconoce identidad, contacto, ubicación, titular, resumen, la experiencia laboral completa, educación, idiomas, habilidades y certificaciones, y **calcula** los años de experiencia sin contar dos veces los periodos solapados. Escribe el JSON que se importa desde la página de Perfil.
-- **Filtros y puntaje de vacantes.** Descarta por salario, modalidad, inglés hablado y trabajo en terreno; puntúa de 0 a 100 contra la hoja de vida, en el equipo y sin red, mostrando las palabras concretas que produjeron cada puntaje. Revisión interactiva en la terminal, ordenada por compatibilidad.
+- **Extractor de texto de PDF sin dependencias.** Node ya trae `zlib`, que es lo único necesario. Entiende las fuentes simples de un byte (Word, LibreOffice, navegador) y las compuestas subsetadas con `/ToUnicode` (WeasyPrint, Canva, Chrome), donde los bytes son identificadores de glifo y sin el mapa de la fuente el texto es ilegible. Si el PDF no tiene capa de texto, lo dice y se detiene.
+- **Hoja de vida → Perfil Único.** Reconoce identidad, contacto, ubicación, titular, resumen, experiencia laboral completa, educación, idiomas, habilidades y certificaciones, y **calcula** los años de experiencia sin contar dos veces los periodos solapados. Escribe el JSON que se importa desde la página de Perfil.
+- **Filtros y puntaje de vacantes.** Descarta por salario, modalidad, inglés hablado y trabajo en terreno; puntúa de 0 a 100 contra la hoja de vida, en el equipo y sin red, mostrando las palabras que produjeron cada puntaje. Revisión interactiva en la terminal, ordenada por compatibilidad.
 - **Dos campos nuevos en el perfil**, `habilidades` y `certificaciones`, con sus patrones en el matcher: las secciones de la hoja de vida que antes no tenían dónde caer.
 
-**Lo que esta entrega NO hace, a propósito:** no entra a los portales, no inicia sesión, no rastrea vacantes y no envía postulaciones. Cuando la persona marca una vacante, la herramienta le entrega el enlace; ella abre, rellena con el botón de POSTULA, revisa y envía. `tests/envio-contract.mjs` ahora prohíbe en `herramientas/` las llamadas de red, los controladores de navegador, la lectura de contraseñas y la navegación a un portal, para que esto no se pueda deshacer por descuido.
+**Lo que esta entrega NO hace, a propósito:** no entra a los portales, no inicia sesión, no rastrea vacantes y no envía postulaciones. Cuando la persona marca una vacante recibe el enlace; ella abre, rellena con el botón de POSTULA, revisa y envía. `tests/envio-contract.mjs` ahora prohíbe en `herramientas/` las llamadas de red, los controladores de navegador, la lectura de contraseñas y la navegación a un portal.
 
-**Cuatro fallos reales que encontró esta entrega:**
+**Siete fallos reales que encontró esta entrega.** Cinco en el producto, blindados con pruebas:
 
-1. El tramo WinAnsi `0x80–0x9F` se leía como latin1, así que las comillas tipográficas y las rayas de cualquier hoja de vida salían como caracteres de control.
+1. El tramo WinAnsi `0x80–0x9F` se leía como latin1: las comillas tipográficas y las rayas de cualquier hoja de vida salían como caracteres de control.
 2. Las funciones de un cargo arrastraban la cabecera del cargo siguiente.
-3. Un título «en curso» le ganaba al título terminado, y el perfil declaraba un estudio sin terminar como si fuera un título obtenido.
-4. El reconocimiento del nivel educativo solo entendía la forma masculina: «Tecnóloga» o «Ingeniera» se quedaban sin título.
+3. Un título «en curso» le ganaba al terminado, y el perfil declaraba un estudio sin terminar como si fuera un título obtenido.
+4. El nivel educativo solo se reconocía en masculino: «Tecnóloga» o «Ingeniera» se quedaban sin título.
+5. **El motor confundía los requisitos del cargo con los datos de la persona.** «Habilidades requeridas para el cargo» caía en `titularProfesional`, «Años de experiencia requeridos» en `anosExperiencia`. POSTULA habría escrito los datos del usuario dentro de la descripción del puesto: una afirmación falsa sobre él ante un empleador.
 
-Y dos más, fuera del código de producto:
+Y dos en el repositorio, no en el producto:
 
-- Los patrones `hv-*` y `hoja-de-vida*` de `.gitignore`, pensados para que nadie suba su hoja de vida, estaban dejando fuera del repositorio tres archivos fuente de esta misma entrega. Quedó anclado y con su propio candado.
-- **POSTULA CI nunca había arrancado.** Un paso con `run: echo "- Resultado: ..."` mete un `: ` dentro de un escalar YAML sin comillas: el archivo deja de parsearse y GitHub responde con fallo de arranque y cero jobs, que no se parece a una prueba en rojo. Venía así desde que se escribió, y los disparadores además apuntaban a una rama `main` que no existe. Corregido, con un candado que reproduce el fallo.
+6. Los patrones `hv-*` y `hoja-de-vida*` de `.gitignore` dejaban fuera del repositorio tres archivos fuente de esta entrega. Anclados, con candado propio.
+7. **POSTULA CI nunca había arrancado.** Un `: ` sin comillas en un escalar YAML rompe el parseo: GitHub responde con fallo de arranque y cero jobs, que no se parece a una prueba en rojo. Además los disparadores apuntaban a una rama `main` que no existe. Corregido, con candado.
 
 ## Archivos modificados en esta entrega
 
-- `.github/workflows/ci.yml` — sintaxis de los `.mjs` de `herramientas/` y `tests/`, arranque de las dos herramientas, y disparadores que sí coinciden con las ramas que existen en el remoto.
+- `.github/workflows/ci.yml` — sintaxis de los `.mjs`, arranque de las dos herramientas, y disparadores que sí coinciden con las ramas del remoto.
 - `.github/workflows/readme-deploy-snapshot.yml` — mismo arreglo de disparadores.
-- `.gitignore` — los archivos de vacantes de la persona no entran al repositorio; y los patrones de hoja de vida quedan anclados a la raíz, porque sin anclar también tapaban el código fuente que se llama igual.
-- `AGENTS.md` — estado de la Entrega 3, candados nuevos, prioridades al día y mapa del repositorio.
+- `.gitignore` — las vacantes de la persona no entran al repositorio, y los patrones de hoja de vida quedan anclados a la raíz.
+- `AGENTS.md` — estado de la Entrega 3, candados, prioridades y mapa del repositorio.
 - `README.md` — esta foto de entrega.
 - `docs/HERRAMIENTAS.md` — las dos herramientas, sus opciones y sus límites.
 - `extension/lib/perfil.js` — grupo «Conocimientos» con `habilidades` y `certificaciones`.
-- `extension/content/matcher.js` — patrones de reconocimiento para los dos campos nuevos.
-- `herramientas/hv-a-perfil.mjs` — CLI: hoja de vida en PDF → perfil importable, con informe de lo que quedó vacío.
+- `extension/content/matcher.js` — patrones para los dos campos nuevos, y exclusión de los rótulos que describen la vacante en vez de a la persona.
+- `tests/matcher-contract.mjs` — 19 casos nuevos sobre esa exclusión, en ambas direcciones.
+- `herramientas/hv-a-perfil.mjs` — CLI: PDF → perfil importable, con informe de lo que quedó vacío.
 - `herramientas/vacantes.mjs` — CLI: filtra, puntúa, ordena y pregunta; entrega enlaces, no postulaciones.
 - `herramientas/ejemplo-vacantes.txt` — formato del archivo de vacantes, con datos ficticios.
 - `herramientas/lib/pdf-texto.mjs` — extractor de texto de PDF sin dependencias.
 - `herramientas/lib/hoja-de-vida.mjs` — texto de hoja de vida → perfil, sin inventar campos.
-- `herramientas/lib/esquema.mjs` — puente al esquema de `extension/lib/perfil.js`: una sola definición del perfil.
+- `herramientas/lib/esquema.mjs` — puente al esquema de la extensión: una sola definición del perfil.
 - `herramientas/lib/criterios.mjs` — salario colombiano, modalidad, inglés hablado, trabajo en terreno.
 - `herramientas/lib/puntaje.mjs` — compatibilidad de 0 a 100, explicable y sin red.
 - `herramientas/lib/vacantes.mjs` — lectura de la lista en texto o JSON.
@@ -50,9 +52,9 @@ Y dos más, fuera del código de producto:
 - `tests/pdf-contract.mjs` — candado del extractor sobre las cuatro formas reales de escribir un PDF.
 - `tests/hoja-de-vida-contract.mjs` — candado de «nunca inventar», con los cuatro fallos de arriba como casos.
 - `tests/vacantes-contract.mjs` — candado de filtros y puntaje.
-- `tests/proyecto-contract.mjs` — dos candados nuevos: ningún archivo de código puede quedar tapado por `.gitignore`, y los workflows tienen que poder parsearse.
+- `tests/proyecto-contract.mjs` — dos candados: ningún archivo de código tapado por `.gitignore`, y los workflows deben parsearse.
 - `tests/pdf/constructor.mjs` — constructor de PDF de prueba en memoria; el repositorio no admite archivos PDF.
-- `tests/navegador/cdp.mjs` — el navegador se lanza con perfil propio y puerto asignado por el sistema, y un fallo ahora explica por qué.
+- `tests/navegador/cdp.mjs` — navegador con perfil propio y puerto del sistema; un fallo ahora explica por qué.
 
 ## Validación
 
