@@ -44,6 +44,17 @@ jobs:
             node --check "$archivo"
             echo "ok $archivo"
           done
+          for archivo in $(find herramientas tests -name '*.mjs'); do
+            node --check "$archivo"
+            echo "ok $archivo"
+          done
+
+      - name: Las herramientas de terminal arrancan sin argumentos
+        run: |
+          set -e
+          node herramientas/hv-a-perfil.mjs --ayuda > /dev/null
+          node herramientas/vacantes.mjs --ayuda > /dev/null
+          echo "ok ayuda de las dos herramientas"
 
       - name: El manifiesto es JSON válido
         run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"

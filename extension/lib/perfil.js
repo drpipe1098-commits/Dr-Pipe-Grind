@@ -79,6 +79,15 @@
         { id: 'institucion', etiqueta: 'Institución', tipo: 'text' },
         { id: 'anoGrado', etiqueta: 'Año de grado', tipo: 'numero' }
       ]
+    },
+    {
+      id: 'conocimientos',
+      titulo: 'Conocimientos',
+      ayuda: 'Lo que los portales piden como «habilidades», «conocimientos» o «certificaciones».',
+      campos: [
+        { id: 'habilidades', etiqueta: 'Habilidades y tecnologías', tipo: 'parrafo' },
+        { id: 'certificaciones', etiqueta: 'Certificaciones y cursos', tipo: 'parrafo' }
+      ]
     }
   ];
 

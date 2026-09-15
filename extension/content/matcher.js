@@ -208,6 +208,21 @@
       veta: ['empresa', 'vacante', 'funciones del cargo'],
       tipos: ['textarea']
     },
+    habilidades: {
+      fuertes: ['habilidades', 'competencias', 'conocimientos', 'aptitudes',
+                'tecnologias', 'herramientas que manejas', 'skills', 'habilidades tecnicas',
+                'conocimientos tecnicos', 'areas de conocimiento'],
+      debiles: [],
+      veta: ['idioma', 'requeridas', 'requisitos', 'que buscamos', 'del cargo'],
+      tipos: ['textarea', 'text']
+    },
+    certificaciones: {
+      fuertes: ['certificaciones', 'certificados', 'cursos realizados', 'cursos y certificaciones',
+                'diplomados', 'formacion complementaria', 'otros estudios', 'certifications'],
+      debiles: ['cursos'],
+      veta: ['requeridas', 'requisitos', 'del cargo'],
+      tipos: ['textarea', 'text']
+    },
     anosExperiencia: {
       fuertes: ['anos de experiencia', 'años de experiencia', 'tiempo de experiencia',
                 'experiencia en anos', 'years of experience'],

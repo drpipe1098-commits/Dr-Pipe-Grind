@@ -100,9 +100,46 @@ Tratar esto como base ya construida salvo que el código o las pruebas demuestre
 
 Primer fallo real que encontró esta entrega: la exclusión amplia de la palabra «donde» descartaba rótulos legítimos como «Ciudad donde resides». Corregido y blindado con casos nuevos en `tests/matcher-contract.mjs`.
 
+### Entrega 3 — De la hoja de vida al perfil, y de la vacante al puntaje
+
+Dos herramientas de terminal (`herramientas/`), ejecutables con `node`, sin
+dependencias. No son parte de la extensión y no entran a ningún portal.
+
+- extractor de texto de PDF sin dependencias (`herramientas/lib/pdf-texto.mjs`):
+  entiende fuentes simples de un byte —incluido el tramo WinAnsi `0x80–0x9F`,
+  donde están las comillas tipográficas y la raya— y fuentes compuestas
+  subsetadas con `/ToUnicode`, que es lo que producen WeasyPrint, Canva y
+  Chrome; cuando el PDF no tiene capa de texto lo reporta en vez de devolver
+  vacío;
+- reconocimiento de hoja de vida (`herramientas/lib/hoja-de-vida.mjs`): parte
+  el texto en secciones, reconoce identidad, contacto, ubicación, experiencia
+  laboral completa, educación, idiomas, habilidades y certificaciones, y
+  **calcula** los años de experiencia sin contar dos veces los periodos
+  solapados;
+- `herramientas/hv-a-perfil.mjs`: escribe el perfil en JSON listo para
+  importar, e informa qué campos quedaron vacíos y por qué;
+- filtros y puntaje de vacantes (`herramientas/lib/criterios.mjs`,
+  `puntaje.mjs`): descarte por salario, modalidad, inglés hablado y trabajo en
+  terreno, más un puntaje de compatibilidad de 0 a 100 calculado en el equipo,
+  sin red, con las palabras concretas que lo justifican;
+- `herramientas/vacantes.mjs`: revisión interactiva en la terminal que ordena
+  las vacantes por compatibilidad y, cuando la persona dice que sí, **le
+  entrega el enlace**. No abre el navegador, no rellena y no envía;
+- dos campos nuevos en el perfil, `habilidades` y `certificaciones`, con sus
+  patrones en el matcher: las secciones de la hoja de vida que antes no tenían
+  dónde caer.
+
+Fallos reales que encontró esta entrega: el tramo WinAnsi alto se leía como
+latin1 y convertía las rayas y comillas de cualquier hoja de vida en
+caracteres de control; las funciones de un cargo arrastraban la cabecera del
+cargo siguiente; un título «en curso» le ganaba al título terminado; y el
+reconocimiento de nivel educativo solo entendía la forma masculina, así que
+«Tecnóloga» o «Ingeniera» se quedaban sin título. Los cuatro quedaron
+blindados en `tests/hoja-de-vida-contract.mjs` y `tests/pdf-contract.mjs`.
+
 ### Pendiente (ver sección 9)
 
-Tablero, Radar de vacantes por correo, Recetas por portal y Redactor.
+Tablero, lectura automática de las alertas de empleo del correo, Recetas por portal y Redactor.
 
 ---
 
@@ -143,10 +180,13 @@ Las pruebas de `tests/` no son solo pruebas unitarias: **son candados sobre las 
 Candados vigentes:
 
 - `tests/privacidad-contract.mjs` — la extensión no contiene llamadas de red ni permisos de red; no usa `chrome.storage.sync`.
-- `tests/envio-contract.mjs` — el código no hace clic en botones de envío ni llama `form.submit()`.
+- `tests/envio-contract.mjs` — el código no hace clic en botones de envío ni llama `form.submit()`; y las herramientas de `herramientas/` no pueden hacer red, arrancar un navegador, leer contraseñas ni navegar a un portal.
 - `tests/perfil-contract.mjs` — el esquema de perfil es estable, validable y su exportación es reversible.
 - `tests/matcher-contract.mjs` — el reconocimiento acierta en los campos típicos de portales colombianos y **nunca** reconoce contraseñas, pagos ni búsqueda.
 - `tests/navegador-contract.mjs` — el autorrelleno se comporta bien en un Chromium real sobre formularios construidos como los de los portales colombianos.
+- `tests/pdf-contract.mjs` — el texto se extrae de las cuatro formas reales de escribir un PDF, los acentos sobreviven, y lo ilegible se reporta en vez de devolverse vacío.
+- `tests/hoja-de-vida-contract.mjs` — la hoja de vida se convierte en perfil **sin inventar**: lo que el documento no dice queda vacío y se reporta como pendiente.
+- `tests/vacantes-contract.mjs` — los filtros descartan lo que deben, ante la duda la vacante pasa con advertencia, y el puntaje es auditable.
 - `tests/proyecto-contract.mjs` — `AGENTS.md`, `README.md` y el manifiesto conservan su estructura obligatoria; ningún archivo del repositorio contiene datos personales reales.
 
 ### Compuertas de POSTULA CI
@@ -237,7 +277,7 @@ Cuando no haya PR abierto ni pedido explícito del usuario, continuar en este or
 
 1. **Endurecer el reconocimiento de campos** con casos reales encontrados al postularse. Cada campo que falle en un portal real se convierte en un caso de `tests/matcher-contract.mjs` y, si depende del DOM, en un formulario nuevo bajo `tests/navegador/`.
 2. **Tablero de postulaciones** — registro local de a qué se postuló, fecha, estado, respuesta y próximo seguimiento. Sin servidor.
-3. **Radar de vacantes** — lectura de las alertas de empleo que los portales envían al correo del usuario, para armar la lista diaria ya filtrada. Sin scraping: el usuario activa las alertas y POSTULA solo lee su propio buzón, con su autorización.
+3. **Radar de vacantes** — la mitad del filtrado ya existe en `herramientas/vacantes.mjs`, pero la lista se arma a mano. Falta leer las alertas de empleo que los portales envían al correo del usuario para armarla sola. Sin scraping: el usuario activa las alertas y POSTULA solo lee su propio buzón, con su autorización.
 4. **Recetas por portal** — ajustes específicos para formularios difíciles, cuando el motor genérico no alcance.
 5. **Redactor** — texto de presentación adaptado a cada vacante, y respuestas preparadas a preguntas frecuentes del reclutador.
 
@@ -254,7 +294,8 @@ Referencias opcionales, leer solo cuando la tarea lo pida:
 - `docs/INSTALACION.md` — cómo instala y usa la extensión una persona sin conocimientos técnicos;
 - `docs/PERFIL.md` — esquema de datos del perfil y reglas de validación;
 - `docs/MATCHER.md` — cómo funciona el reconocimiento de campos y cómo agregar patrones;
-- `docs/TESTING.md` — comandos de prueba y modelo de evidencia.
+- `docs/TESTING.md` — comandos de prueba y modelo de evidencia;
+- `docs/HERRAMIENTAS.md` — las dos herramientas de terminal, sus opciones y sus límites.
 
 ---
 
@@ -267,8 +308,11 @@ extension/          la extensión completa, cargable tal cual en el navegador
   lib/              lógica compartida (perfil, normalización)
   content/          código que se inyecta en la página del portal
   iconos/           iconos de la extensión
+herramientas/       programas de terminal (node, sin dependencias)
+  lib/              lectura de PDF, hoja de vida, criterios y puntaje
 tests/              pruebas de contrato en Node, sin dependencias
   navegador/        cliente CDP y formularios que imitan portales reales
+  pdf/              constructor de PDF de prueba, en memoria
 AGENTS.md           este archivo
 README.md           foto de la última entrega únicamente
 ```
