@@ -82,6 +82,23 @@ preguntar.
 11. **De la IP no se guarda nunca la direccion, solo su hash con sal.** Ni en la
     base ni en los registros.
 
+12. **Ningun texto llega al publicador sin pasar por el filtro estricto.** Lo
+    impone el tipo `PublishableCaption`, que solo produce `validateCaption`. Si
+    alguien lo convierte en un `string` corriente para "simplificar", la garantia
+    desaparece y no queda ningun error que lo avise. La prueba con
+    `@ts-expect-error` en `tests/captions.test.ts` existe justo para eso.
+
+13. **Los terminos de la lista dura no son configurables.** Los que sugieren
+    minoria de edad, falta de consentimiento o parentesco no admiten excepcion
+    por organizacion ni por plataforma. No es una preferencia de producto.
+
+14. **Una tabla nueva nace SIN privilegios para `authenticated`.** El
+    `grant ... on all tables` de la migracion 000900 solo alcanzo a las que
+    existian entonces; el sintoma es un "permission denied" que no menciona el
+    RLS por ningun lado. La migracion 001200 dejo puesto un
+    `alter default privileges`, pero conviene comprobarlo con una asercion en
+    cada tabla nueva.
+
 ## Topologia de compuertas
 
 ```
@@ -95,8 +112,8 @@ docker ────┘
 ```
 
 `rls` levanta un PostgreSQL 16 de servicio, aplica el arranque de auth que
-reproduce lo que Supabase da de fabrica, corre las once migraciones y ejecuta las
-65 aserciones.
+reproduce lo que Supabase da de fabrica, corre las trece migraciones y ejecuta las
+78 aserciones.
 
 La compuerta `docker` construye las dos imagenes de verdad. Existe porque el
 despliegue es por contenedores: un Dockerfile roto no se descubriria al hacer
@@ -110,6 +127,9 @@ merge sino al intentar desplegar.
 | `src/app/[locale]/u/[token]/` | Pagina publica de subida sin cuenta |
 | `src/app/api/uploads/presign/` | Unico endpoint que atiende sin sesion |
 | `src/lib/scheduling/hard-rule.ts` | Motor anti-repeticion, codigo puro |
+| `src/lib/captions/validator.ts` | Filtro estricto y el tipo `PublishableCaption` |
+| `src/lib/captions/provider.ts` | Interfaz del generador; hoy un simulado |
+| `src/lib/captions/pipeline.ts` | Generar -> validar -> reintentar -> fallar cerrado |
 | `src/lib/crypto/secrets.ts` | Cifrado AES-256-GCM, formato versionado `v1.` |
 | `src/lib/credentials.ts` | Unico camino de entrada y salida de los tokens |
 | `src/lib/rate-limit.ts` | Ventana fija en memoria y hash de IP |
@@ -125,9 +145,9 @@ merge sino al intentar desplegar.
 | Modulo | Estado |
 |---|---|
 | 1 — Roles y aislamiento | Completo y probado |
-| 2 — Ingesta y vault | Subidas completas. Faltan conectores de Drive/Dropbox |
+| 2 — Ingesta y vault | Subidas completas. Conectores: esquema y RLS listos, sin logica de APIs (`docs/CONECTORES.md`) |
 | 3 — Pipeline de medios | Workers escritos; solo la sanitizacion EXIF esta verificada |
-| 4 — Hard Rule | Motor completo y probado. Falta el validador de textos |
+| 4 — Hard Rule | Motor y validador de textos completos y probados. Falta conectar un proveedor de IA real |
 | 5 — Distribucion | Modelado en la base; **ningun runner implementado** |
 | 6 — Enlaces y trafico | Acortador y analitica funcionando. Falta el panel de metricas |
 | 7 — Finanzas | Esquema y vista de la modelo. Falta la gestion desde el estudio |
@@ -139,6 +159,16 @@ merge sino al intentar desplegar.
   la autoritativa en PostgreSQL.
 - ~~Falta la funcion de cifrado de credenciales~~ → `src/lib/crypto/secrets.ts`,
   con 20 pruebas centradas en la deteccion de manipulacion.
+
+## Pendiente de decision del arquitecto
+
+- **Empezar los conectores por Dropbox.** Su OAuth es mas simple, acota la app a
+  una carpeta y no exige revision previa; serviria para validar la tuberia
+  mientras corre el tramite de verificacion de Google, que tarda semanas.
+- **Asignacion automatica de archivos a una modelo** cuando una carpeta
+  compartida tiene varias.
+- **Que hacer con los duplicados detectados por checksum:** descartar solos o
+  dejar marcados.
 
 ## Riesgos abiertos
 
@@ -153,3 +183,11 @@ merge sino al intentar desplegar.
 - **Las imagenes Docker se construyen en CI pero no se han arrancado en un
   servidor.** El primer despliegue real sigue siendo la prueba que falta.
 - **No hay copia de seguridad automatizada** de nada que no cubra Supabase.
+- **La verificacion de Google para los alcances de Drive tarda semanas** y limita
+  a 100 usuarios mientras tanto. Conviene iniciar el tramite antes que el codigo.
+- **Google entrega el refresh token solo en la primera autorizacion** salvo que
+  se pida `prompt=consent`. Perderlo obliga a desconectar y reconectar a mano: es
+  el fallo mas comun de estas integraciones.
+- **Los diccionarios de terminos penalizados son heuristicas observadas**, no
+  reglas publicadas. Ninguna plataforma documenta su lista; habra que ajustarlos
+  cuando cambie el comportamiento real.

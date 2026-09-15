@@ -9,7 +9,7 @@ Contexto durable en `AGENTS.md` y `docs/`.
 
 ---
 
-## Estado: Entrega 1 — Cimientos + endurecimiento
+## Estado: Sprint 2, Fase 1 — Validador de textos
 
 Lo que existe y esta verificado:
 
@@ -38,6 +38,12 @@ Lo que existe y esta verificado:
   ventana autoritativa en PostgreSQL. De la IP solo se guarda su hash con sal.
 - **Despliegue en contenedores.** Imagen del panel (Next standalone) e imagen de
   los workers (con FFmpeg), orquestadas para VPS propio.
+- **Validador de textos (Modulo 4).** Tuberia generar → validar → reintentar →
+  fallar cerrado, con filtro estricto de terminos, enlaces, longitud y formato
+  por plataforma. La garantia de que nada del LLM llega al publicador sin filtrar
+  la impone el compilador, no una convencion.
+- **Esquema de conectores de nube (Modulo 2).** Tablas, RLS y tipos para Google
+  Drive y Dropbox. Sin logica de APIs todavia: ver `docs/CONECTORES.md`.
 
 ### Validacion
 
@@ -45,8 +51,8 @@ Lo que existe y esta verificado:
 |---|---|
 | ESLint | limpio |
 | TypeScript estricto | limpio |
-| Unidad (Hard Rule, cifrado, limite) | 75/75 |
-| Aislamiento RLS y limite de tasa | 65/65 contra PostgreSQL 16 |
+| Unidad (Hard Rule, cifrado, limite, textos) | 117/117 |
+| Aislamiento RLS, limite y conectores | 78/78 contra PostgreSQL 16 |
 | Build de produccion | correcto, 8 rutas y middleware |
 | Barrera anti-doxxing | GPS 4 campos → 0, pixeles intactos |
 | Imagenes Docker | se construyen en CI |
@@ -89,6 +95,7 @@ src/
   app/[locale]/          Paneles por rol, login y pagina publica de subida
   app/api/uploads/       Emision de URLs prefirmadas
   lib/scheduling/        Motor Hard Rule (codigo puro, sin dependencias)
+  lib/captions/          Validador de textos y tuberia del Modulo 4
   lib/crypto/            Cifrado AES-256-GCM de credenciales
   lib/credentials.ts     Unico camino de entrada y salida de los tokens
   lib/rate-limit.ts      Ventana fija y hash de IP
@@ -96,22 +103,24 @@ src/
   lib/r2.ts              Cloudflare R2 por API S3
   middleware.ts          Redirector de enlaces cortos, i18n y sesion
 supabase/
-  migrations/            Once migraciones en orden
-  tests/                 65 aserciones de aislamiento, compuertas y limite
+  migrations/            Trece migraciones en orden
+  tests/                 78 aserciones de aislamiento, compuertas, limite y conectores
 workers/                 Pipeline de medios en Python
-tests/                   75 pruebas de unidad
+tests/                   117 pruebas de unidad
 docs/                    Arquitectura, instalacion, base de datos, pruebas, despliegue
 Dockerfile               Imagen del panel (Next standalone)
 workers/Dockerfile       Imagen de los workers (con FFmpeg)
 docker-compose.yml       Orquestacion para VPS propio
 ```
 
-## Siguiente entrega (Sprint 2)
+## Siguiente entrega
 
-Aprobado por el arquitecto, pendiente de arrancar:
+Pendiente de aprobacion:
 
-1. Validador de textos del Modulo 4 (regex + motor de IA).
-2. Conectores de ingesta de Google Drive y Dropbox (Modulo 2).
+1. **Fase 2 del Sprint 2** — logica OAuth2 y APIs de Google Drive y Dropbox.
+   El esquema ya esta; el diseño y las decisiones delicadas, en `docs/CONECTORES.md`.
+2. **Conectar un proveedor de IA real** al generador de textos. La interfaz esta
+   lista y el simulado cubre las pruebas.
 
 El Modulo 5 (runners de publicacion a Telegram, X, Reddit y Bluesky) sigue
 modelado en la base pero sin implementar. Ver `AGENTS.md`.

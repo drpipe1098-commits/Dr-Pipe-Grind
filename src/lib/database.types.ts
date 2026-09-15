@@ -25,10 +25,20 @@ export type AssetStatus = 'raw' | 'edited' | 'scheduled' | 'published' | 'archiv
 export type Platform = 'telegram' | 'x' | 'reddit' | 'bluesky' | 'webhook';
 export type CredentialType = 'oauth' | 'api_key';
 export type ScheduleStatus = 'queued' | 'publishing' | 'published' | 'failed' | 'cancelled';
-export type JobType = 'sanitize_exif' | 'watermark' | 'transcode' | 'generate_teaser' | 'publish';
+export type JobType =
+  | 'sanitize_exif'
+  | 'watermark'
+  | 'transcode'
+  | 'generate_teaser'
+  | 'publish'
+  | 'scan_cloud_folder'
+  | 'ingest_cloud_file';
 export type JobStatus = 'pending' | 'claimed' | 'done' | 'failed' | 'dead';
 export type ComplianceStatus = 'pending' | 'verified' | 'expired' | 'rejected';
 export type PayoutStatus = 'pending' | 'approved' | 'paid' | 'disputed';
+export type CloudProvider = 'google_drive' | 'dropbox';
+export type CloudConnectionStatus = 'active' | 'expired' | 'revoked' | 'error';
+export type CloudItemStatus = 'discovered' | 'queued' | 'ingested' | 'skipped' | 'failed';
 
 export type OrganizationRow = {
   id: string;
@@ -231,6 +241,49 @@ export type PlatformCredentialRow = {
   created_at: string;
 }
 
+export type CloudConnectionRow = {
+  id: string;
+  organization_id: string;
+  provider: CloudProvider;
+  account_email: string | null;
+  label: string;
+  /** Cifrado con AES-256-GCM. Nunca el token en claro. */
+  access_ciphertext: string;
+  refresh_ciphertext: string;
+  token_expires_at: string;
+  scopes: string[];
+  status: CloudConnectionStatus;
+  root_folder_id: string | null;
+  root_folder_path: string | null;
+  default_profile_id: string | null;
+  /** `pageToken` en Drive, `cursor` en Dropbox: permite escaneo incremental. */
+  delta_cursor: string | null;
+  last_scan_at: string | null;
+  last_error: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type CloudIngestItemRow = {
+  id: string;
+  connection_id: string;
+  organization_id: string;
+  remote_file_id: string;
+  remote_path: string | null;
+  remote_name: string;
+  remote_mime_type: string | null;
+  remote_size_bytes: number | null;
+  remote_modified_at: string | null;
+  remote_checksum: string | null;
+  status: CloudItemStatus;
+  skip_reason: string | null;
+  last_error: string | null;
+  profile_id: string | null;
+  media_asset_id: string | null;
+  discovered_at: string;
+  ingested_at: string | null;
+};
+
 /**
  * Forma que consume `@supabase/supabase-js` para tipar consultas.
  *
@@ -255,6 +308,8 @@ export type Database = {
       link_clicks: { Row: LinkClickRow; Insert: Partial<LinkClickRow>; Update: Partial<LinkClickRow>; Relationships: [] };
       financial_records: { Row: FinancialRecordRow; Insert: Partial<FinancialRecordRow>; Update: Partial<FinancialRecordRow>; Relationships: [] };
       jobs: { Row: JobRow; Insert: Partial<JobRow>; Update: Partial<JobRow>; Relationships: [] };
+      cloud_connections: { Row: CloudConnectionRow; Insert: Partial<CloudConnectionRow>; Update: Partial<CloudConnectionRow>; Relationships: [] };
+      cloud_ingest_items: { Row: CloudIngestItemRow; Insert: Partial<CloudIngestItemRow>; Update: Partial<CloudIngestItemRow>; Relationships: [] };
       platform_credentials: { Row: PlatformCredentialRow; Insert: Partial<PlatformCredentialRow>; Update: Partial<PlatformCredentialRow>; Relationships: [] };
     };
     Views: { [_ in never]: never };

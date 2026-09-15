@@ -7,8 +7,8 @@ las agrega.
 |---|---|---|
 | `linters` | ESLint sobre todo el proyecto | `npm run lint` |
 | `typescript` | `tsc --noEmit` en modo estricto | `npm run typecheck` |
-| `unidad` | 75 casos: Hard Rule, cifrado y limite de tasa | `npm test` |
-| `aislamiento RLS` | 65 aserciones contra PostgreSQL real | `npm run test:rls` |
+| `unidad` | 117 casos: Hard Rule, cifrado, limite de tasa y textos | `npm test` |
+| `aislamiento RLS` | 78 aserciones contra PostgreSQL real | `npm run test:rls` |
 | `build` | Compilacion de produccion de Next | `npm run build` |
 | `workers python` | Sintaxis y la barrera anti-doxxing | `python workers/verificar_sanitizacion.py` |
 | `imagenes docker` | Construye las dos imagenes y valida el compose | `docker compose build` |
@@ -37,6 +37,20 @@ conteo de clics se reparte dinero: inflarlo no es vandalismo, es fraude. Las
 aserciones de PostgreSQL se ejecutan como `anon`, que es exactamente el rol desde
 el que se intentaria, y comprueban ademas que omitir el hash de IP no sea una via
 de escape.
+
+**El validador de textos** (42 casos) se prueba en dos direcciones opuestas y
+las dos importan igual. Hacia un lado, que no se pueda esquivar: los terminos
+prohibidos se prueban escritos con puntos, con espacios, en leet, con acentos
+añadidos y partidos con caracteres invisibles, que es como se intentan colar de
+verdad. Hacia el otro, que no de falsos positivos: "canteen" y "Menorca" no se
+bloquean pese a contener terminos vetados, porque un filtro que estorba se acaba
+desactivando, y desactivado no protege de nada.
+
+Una de esas pruebas no la ejecuta vitest sino el compilador. `PublishableCaption`
+es una cadena con una marca que solo produce el validador, y la prueba incluye un
+`@ts-expect-error` al asignarle un `string` corriente: si la marca se debilitara,
+`npm run typecheck` fallaria por directiva inutil. Comprobado quitando la marca a
+proposito — la prueba falla, como debe.
 
 **El RLS** es la unica pieza cuyo fallo no tiene vuelta atras. Si una politica
 esta mal, el material privado de una modelo aparece en el panel de otra agencia,
