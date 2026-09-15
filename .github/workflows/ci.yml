@@ -1,11 +1,16 @@
 name: POSTULA CI
 run-name: POSTULA CI · ${{ github.event_name }} · ${{ github.ref_name }}
 
+# `main` se conserva porque es la rama canónica según AGENTS.md §1, pero hoy
+# no existe en el remoto: la rama por defecto es `claude/sweet-volta-2j06w0`.
+# Mientras eso no se resuelva, unos disparadores que solo miran `main` dejan
+# el CI sin correr nunca, y la compuerta obligatoria del §6 no se puede
+# cumplir. Por eso se incluyen también las ramas de trabajo.
 on:
   push:
-    branches: [main]
+    branches: [main, 'claude/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'claude/**']
   workflow_dispatch:
 
 permissions:

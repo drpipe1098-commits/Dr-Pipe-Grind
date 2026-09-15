@@ -26,7 +26,8 @@ Y uno más, en el repositorio y no en el código: los patrones `hv-*` y `hoja-de
 
 ## Archivos modificados en esta entrega
 
-- `.github/workflows/ci.yml` — sintaxis de los `.mjs` de `herramientas/` y `tests/`, y arranque de las dos herramientas.
+- `.github/workflows/ci.yml` — sintaxis de los `.mjs` de `herramientas/` y `tests/`, arranque de las dos herramientas, y disparadores que sí coinciden con las ramas que existen en el remoto.
+- `.github/workflows/readme-deploy-snapshot.yml` — mismo arreglo de disparadores.
 - `.gitignore` — los archivos de vacantes de la persona no entran al repositorio; y los patrones de hoja de vida quedan anclados a la raíz, porque sin anclar también tapaban el código fuente que se llama igual.
 - `AGENTS.md` — estado de la Entrega 3, candados nuevos, prioridades al día y mapa del repositorio.
 - `README.md` — esta foto de entrega.
