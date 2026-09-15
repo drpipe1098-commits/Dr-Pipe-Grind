@@ -110,10 +110,13 @@ todos
     const correos = texto.match(/[\w.+-]+@(gmail|hotmail|outlook|yahoo|icloud)\.[a-z.]+/gi) || [];
     c.exigir(correos.length === 0,
       `${archivo} contiene un correo personal real: usa @ejemplo.com en los ejemplos`);
-    const celulares = texto.match(/(?<![\d.])3\d{9}(?![\d.])/g) || [];
-    const reales = celulares.filter((n) => n !== '3001234567');
-    c.exigir(reales.length === 0,
-      `${archivo} contiene lo que parece un celular real: usa 3001234567 en los ejemplos`);
+    // Cédulas y celulares colombianos: rachas de 8 a 10 dígitos.
+    // Solo se permite el número de ejemplo que usan las pruebas.
+    const EJEMPLOS = ['3001234567'];
+    const numeros = (texto.match(/\d{8,10}/g) || []).filter((n) => !EJEMPLOS.includes(n));
+    c.exigir(numeros.length === 0,
+      `${archivo} contiene lo que parece una cédula o un celular real (${numeros[0]}): `
+      + 'usa 3001234567 en los ejemplos');
   });
 
 c.cerrar();
