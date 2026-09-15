@@ -22,7 +22,10 @@ Hasta ahora POSTULA rellenaba formularios, pero la persona tenía que escribir s
 3. Un título «en curso» le ganaba al título terminado, y el perfil declaraba un estudio sin terminar como si fuera un título obtenido.
 4. El reconocimiento del nivel educativo solo entendía la forma masculina: «Tecnóloga» o «Ingeniera» se quedaban sin título.
 
-Y uno más, en el repositorio y no en el código: los patrones `hv-*` y `hoja-de-vida*` de `.gitignore`, pensados para que nadie suba su hoja de vida, estaban dejando fuera del repositorio tres archivos fuente de esta misma entrega. Quedó anclado y con su propio candado.
+Y dos más, fuera del código de producto:
+
+- Los patrones `hv-*` y `hoja-de-vida*` de `.gitignore`, pensados para que nadie suba su hoja de vida, estaban dejando fuera del repositorio tres archivos fuente de esta misma entrega. Quedó anclado y con su propio candado.
+- **POSTULA CI nunca había arrancado.** Un paso con `run: echo "- Resultado: ..."` mete un `: ` dentro de un escalar YAML sin comillas; el archivo entero deja de parsearse y GitHub responde con un fallo de arranque y cero jobs, que no se parece a una prueba en rojo. Venía así desde que se escribió el workflow, y los disparadores además apuntaban a una rama `main` que no existe en el remoto. Ambas cosas corregidas, con un candado que reproduce el fallo.
 
 ## Archivos modificados en esta entrega
 
@@ -47,7 +50,7 @@ Y uno más, en el repositorio y no en el código: los patrones `hv-*` y `hoja-de
 - `tests/pdf-contract.mjs` — candado del extractor sobre las cuatro formas reales de escribir un PDF.
 - `tests/hoja-de-vida-contract.mjs` — candado de «nunca inventar», con los cuatro fallos de arriba como casos.
 - `tests/vacantes-contract.mjs` — candado de filtros y puntaje.
-- `tests/proyecto-contract.mjs` — candado nuevo: ningún archivo de código puede quedar tapado por `.gitignore`.
+- `tests/proyecto-contract.mjs` — dos candados nuevos: ningún archivo de código puede quedar tapado por `.gitignore`, y los workflows tienen que poder parsearse.
 - `tests/pdf/constructor.mjs` — constructor de PDF de prueba en memoria; el repositorio no admite archivos PDF.
 
 ## Validación
@@ -55,7 +58,7 @@ Y uno más, en el repositorio y no en el código: los patrones `hv-*` y `hoja-de
 - **VALIDADO EN CÓDIGO** localmente: los **10 candados** pasan (`npm test`), con los 3 nuevos sumando la extracción de PDF en sus cuatro formas, el reconocimiento de hoja de vida y los filtros de vacantes.
 - El extractor y el reconocedor se probaron además contra **una hoja de vida real en PDF** generada por WeasyPrint, fuera del repositorio: 2 páginas, 16 campos reconocidos, 4 cargos con sus fechas y funciones correctas, y 14 campos correctamente vacíos por no estar en el documento. Los cuatro fallos listados arriba salieron de esa corrida.
 - Los filtros se probaron contra un archivo de vacantes ficticias: de 5 avisos, descartó el que exige inglés B2 conversacional y el presencial de bajo salario con trabajo en terreno, y dejó pasar el que solo pide inglés técnico de lectura.
-- Pendiente de las compuertas del PR: **POSTULA CI / validate**.
+- Pendiente de las compuertas del PR: **POSTULA CI / validate**, que con este arreglo corre por primera vez.
 - **NO está validado en uso real.** El perfil generado todavía no se ha importado en un navegador ni se ha usado para postularse en un portal real.
 
 ## Qué sigue

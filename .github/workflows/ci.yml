@@ -74,7 +74,12 @@ jobs:
 
       - name: Resultado
         if: always()
-        run: echo "- Resultado: \`${{ job.status }}\`" >> "$GITHUB_STEP_SUMMARY"
+        # Va como bloque `|` a propósito: en una sola línea, el «: » de
+        # «Resultado: » convierte el escalar en un mapa y YAML deja de
+        # parsear el archivo entero. Eso es lo que tenía a POSTULA CI sin
+        # arrancar —fallo de arranque, cero jobs— desde que se escribió.
+        run: |
+          echo "- Resultado: \`${{ job.status }}\`" >> "$GITHUB_STEP_SUMMARY"
 
   navegador:
     name: navegador
