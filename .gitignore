@@ -1,0 +1,11 @@
+# Nunca subir datos personales de nadie.
+*.pdf
+mi-perfil-postula.json
+perfil*.json
+hoja-de-vida*
+hv-*
+*.docx
+
+node_modules/
+.DS_Store
+*.zip
