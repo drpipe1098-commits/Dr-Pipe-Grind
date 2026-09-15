@@ -91,6 +91,41 @@ services:
       # contenedor: nunca queda material sin sanitizar en el disco del servidor.
       - /tmp:size=8G
 
+  ingest:
+    build:
+      context: .
+      dockerfile: workers/ingest.Dockerfile
+    restart: unless-stopped
+    environment:
+      # Habla con la base por PostgREST, no por conexion directa: los
+      # envoltorios public.claim_jobs y public.complete_job estan concedidos
+      # solo a service_role.
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_REGION: ${R2_REGION:-auto}
+      # Descifra los refresh tokens de las nubes conectadas.
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      DROPBOX_APP_KEY: ${DROPBOX_APP_KEY}
+      DROPBOX_APP_SECRET: ${DROPBOX_APP_SECRET}
+      UPLOAD_LINK_SECRET: ${UPLOAD_LINK_SECRET}
+      CLICK_IP_SALT: ${CLICK_IP_SALT}
+      INGEST_WORKER_BATCH_SIZE: ${INGEST_WORKER_BATCH_SIZE:-2}
+      INGEST_WORKER_POLL_SECONDS: ${INGEST_WORKER_POLL_SECONDS:-10}
+      INGEST_MAX_BYTES_PER_FILE: ${INGEST_MAX_BYTES_PER_FILE:-5368709120}
+    command: ['sh', '-c', 'WORKER_NAME=ingest-$$(hostname) npx tsx --tsconfig tsconfig.workers.json src/workers/ingest/index.ts']
+    deploy:
+      resources:
+        limits:
+          # Mueve bytes, no los procesa: el archivo va de Dropbox a R2 en flujo,
+          # sin caber entero en memoria. No necesita el margen del worker de medios.
+          cpus: '1.0'
+          memory: 768M
+
   # --- Solo desarrollo -------------------------------------------------------
   minio:
     profiles: ['dev']

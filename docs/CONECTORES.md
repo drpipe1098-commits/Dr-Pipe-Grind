@@ -4,9 +4,9 @@ Escanear Google Drive y Dropbox en busca de material antiguo y traerlo al vault.
 Es el reciclador del Modulo 2: casi toda agencia tiene años de sesiones en una
 carpeta compartida que nadie vuelve a abrir.
 
-**Estado: solo esquema.** Las tablas, el RLS y los tipos estan listos y probados
-(13 aserciones en `supabase/tests/50_connectors.sql`). El flujo OAuth y las
-llamadas a cada API no estan escritos, a la espera de tu visto bueno.
+**Estado: Dropbox implementado.** OAuth2, escaneo, enrutado, deduplicacion e
+ingesta a R2. Google Drive sigue pendiente: mismo esquema, otro archivo en
+`providers/`, y el tramite de verificacion corriendo en paralelo.
 
 ---
 
@@ -36,29 +36,70 @@ Los workers de medios se quedan en Python. No hay razon para tocarlos.
 
 ---
 
-## Estructura propuesta
+## Estructura
 
 ```
+src/lib/connectors/
+  dropbox.ts          Cliente HTTP de la API de Dropbox
+  connection.ts       Guarda, carga y refresca conexiones (cifra los tokens)
+  routing.ts          Enrutado hibrido — codigo puro, muy probado
+  oauth-state.ts      Firma y verifica el parametro `state`
 src/workers/ingest/
   index.ts            Bucle: toma trabajos de la cola y despacha
-  connection.ts       Carga la conexion, descifra tokens, refresca si caducaron
-  providers/
-    types.ts          Interfaz CloudProvider (listar, descargar, cursor)
-    google-drive.ts   Implementacion de Drive
-    dropbox.ts        Implementacion de Dropbox
-  scan.ts             Trabajo scan_cloud_folder:  descubre y registra
-  ingest.ts           Trabajo ingest_cloud_file:  descarga y crea el asset
+  scan.ts             scan_cloud_folder:  descubre, enruta y encola
+  ingest.ts           ingest_cloud_file:  descarga, deduplica y crea el asset
+  media-types.ts      Que archivos merece la pena traer
+src/app/api/conectores/dropbox/
+  start/              Inicia el flujo OAuth2
+  callback/           Retorno: valida, intercambia y guarda la conexion
 ```
 
-La interfaz `CloudProvider` mantiene `scan.ts` e `ingest.ts` ignorantes de si
-detras hay Drive o Dropbox, igual que `CaptionProvider` hace con el generador de
-textos. Añadir OneDrive mañana seria un archivo mas en `providers/`.
+Despliegue: servicio `ingest` en `docker-compose.yml`, con su propia imagen
+(`workers/ingest.Dockerfile`). No necesita FFmpeg, asi que es mucho mas ligera
+que la de los workers de medios.
 
-Despliegue: un tercer servicio en `docker-compose.yml`, misma imagen que el
-panel con otro `command`. No necesita FFmpeg, asi que no carga la imagen pesada
-de los workers de medios.
+Corre TypeScript directamente con `tsx` y un `tsconfig.workers.json` propio. Ese
+tsconfig existe por una razon concreta: los modulos compartidos llevan
+`import 'server-only'`, que lanza una excepcion al cargarse fuera de un React
+Server Component. El tsconfig de los workers lo sustituye por un modulo vacio; el
+principal no lo toca, asi que la proteccion del bundle del navegador sigue intacta.
 
 ---
+
+## Las tres reglas de enrutado
+
+Decididas por el arquitecto e implementadas en `routing.ts`, que es codigo puro
+y por tanto muy probado (14 casos):
+
+1. **`default_profile_id` manda.** El caso de la modelo independiente: todo su
+   Dropbox es suyo. Pesa mas que cualquier deduccion, porque es una decision
+   explicita de quien conecto la cuenta.
+2. **Match por subcarpeta de primer nivel.** El caso del estudio:
+   `/Modelos/alfa_uno/set01/foto.jpg` va al perfil `alfa_uno`. Compara contra el
+   handle y contra el nombre publico, tolerando mayusculas, acentos, guiones y
+   espacios, porque quien creo la carpeta no sabia el handle exacto.
+3. **Sin asignar.** Queda en `unassigned` con la carpeta que se intento, para el
+   triaje del estudio.
+
+Un matiz que no estaba en el encargo: **ante dos perfiles que normalizan igual,
+no se adivina**. El archivo queda sin asignar con motivo `coincidencia_ambigua`.
+Mandar el material de una modelo al perfil de otra es peor que dejarlo sin
+asignar — sin asignar alguien lo revisa; mal asignado, nadie, y acaba publicado
+en la cuenta equivocada.
+
+## Deduplicacion en dos pasos
+
+Los duplicados **nunca se descartan en silencio**. La fila se conserva con
+`status = 'duplicate'`, el motivo y `duplicate_of_item_id` apuntando al original,
+para que el panel pueda decir "ya lo tienes, subido el 3 de marzo".
+
+1. **Antes de descargar**, con el hash que da el proveedor. Es la comprobacion
+   barata: evita traer los bytes.
+2. **Despues de descargar**, con el SHA-256 del contenido, calculado al vuelo
+   mientras los bytes van de Dropbox a R2. Es la certera, y la unica comparable
+   entre proveedores: el mismo archivo en Drive y en Dropbox da distinto checksum
+   remoto y el mismo SHA-256. Si salta, se borra la copia recien subida — la fila
+   se queda, los bytes duplicados no.
 
 ## Los dos trabajos
 
@@ -72,7 +113,13 @@ minutos y horas.
 entero en memoria: hay videos de varios GB), crea la fila en `media_assets` con
 `sanitized = false`, y encola el trabajo de sanitizacion. A partir de ahi el
 material sigue exactamente el mismo camino que una subida desde el movil, con
-las mismas barreras: sin EXIF retirado no se puede programar.
+las mismas barreras: sin EXIF retirado no se puede programar. Que venga de una
+carpeta compartida no le da ningun privilegio — conserva las mismas coordenadas
+GPS que una foto subida a mano.
+
+**Un archivo sin perfil no se descarga.** Sin perfil no hay carpeta de R2 donde
+ponerlo, y traer gigabytes que nadie ha reclamado es trabajo tirado. Espera en
+`unassigned` a que el triaje le asigne uno.
 
 ---
 
@@ -130,13 +177,15 @@ reintentar en bucle es como se acaba en la lista negra del proveedor.
 
 ---
 
-## Preguntas antes de implementar
+## Lo que falta
 
-1. **¿Empezamos por Dropbox?** Su OAuth es mas simple, permite acotar la app a
-   una carpeta y no exige revision previa. Serviria para validar toda la tuberia
-   mientras corre el tramite de verificacion de Google.
-2. **¿Los archivos se asignan a una modelo automaticamente?** El esquema soporta
-   `default_profile_id` por conexion, pero una carpeta compartida con varias
-   modelos necesitaria reglas por subcarpeta.
-3. **¿Que hacemos con los duplicados detectados por checksum?** ¿Se descartan
-   solos o se dejan marcados para que alguien decida?
+- **Google Drive.** Mismo esquema y mismos trabajos; cambia el cliente HTTP y el
+  formato del cursor. El tramite de verificacion es lo que marca el calendario,
+  no el codigo.
+- **Pantalla de triaje.** El backend deja los archivos en `unassigned` con la
+  carpeta que se intento; falta la vista donde el estudio los asigna.
+- **Escaneo programado.** Hoy el trabajo `scan_cloud_folder` hay que encolarlo a
+  mano. Falta decidir la cadencia (¿cada hora? ¿cada noche?) y quien lo dispara.
+- **Prueba contra Dropbox real.** Nada de esto se ha ejecutado contra la API: el
+  entorno de desarrollo no alcanza internet. El enrutado, el estado de OAuth y el
+  filtro de tipos estan probados; el cliente HTTP, no.

@@ -1,7 +1,13 @@
 import 'server-only';
 
 import { randomUUID } from 'node:crypto';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import type { Readable } from 'node:stream';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { serverEnv } from '@/lib/env';
 
@@ -78,6 +84,46 @@ export async function presignUpload(input: PresignUploadInput): Promise<string> 
   return getSignedUrl(r2Client(), command, {
     expiresIn: input.ttlSeconds ?? env.UPLOAD_PRESIGN_TTL_SECONDS,
   });
+}
+
+/**
+ * Sube un flujo directamente al bucket, desde el servidor.
+ *
+ * Lo usa el worker de ingesta: un archivo traido de Dropbox nunca pasa por el
+ * navegador, asi que no hay URL prefirmada de por medio.
+ *
+ * `contentLength` es obligatorio y no por capricho del SDK: sin el, el cliente
+ * de S3 tendria que bufferizar el flujo entero para calcularlo, y con videos de
+ * varios gigabytes eso tumba el contenedor.
+ */
+export async function uploadStream(input: {
+  key: string;
+  body: Readable;
+  contentType: string;
+  contentLength: number;
+}): Promise<void> {
+  const env = serverEnv();
+  await r2Client().send(
+    new PutObjectCommand({
+      Bucket: env.R2_BUCKET,
+      Key: input.key,
+      Body: input.body,
+      ContentType: input.contentType,
+      ContentLength: input.contentLength,
+    }),
+  );
+}
+
+/**
+ * Borra un objeto.
+ *
+ * Lo necesita la ingesta cuando descubre, ya subido el archivo, que su contenido
+ * duplica uno que ya estaba: se conserva la fila del inventario para poder
+ * explicarlo, pero no una segunda copia de los mismos gigabytes.
+ */
+export async function deleteObject(key: string): Promise<void> {
+  const env = serverEnv();
+  await r2Client().send(new DeleteObjectCommand({ Bucket: env.R2_BUCKET, Key: key }));
 }
 
 /**

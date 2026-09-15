@@ -160,11 +160,19 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Construir la imagen de los workers
+      - name: Construir la imagen de los workers de medios
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./workers/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Construir la imagen del worker de ingesta
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./workers/ingest.Dockerfile
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -182,6 +190,8 @@ jobs:
           UPLOAD_LINK_SECRET: marcador
           ENCRYPTION_MASTER_KEY: marcador
           CLICK_IP_SALT: marcador
+          DROPBOX_APP_KEY: marcador
+          DROPBOX_APP_SECRET: marcador
           NEXT_PUBLIC_APP_URL: http://placeholder.invalid
 
   # ---------------------------------------------------------------------------

@@ -92,7 +92,23 @@ preguntar.
     minoria de edad, falta de consentimiento o parentesco no admiten excepcion
     por organizacion ni por plataforma. No es una preferencia de producto.
 
-14. **Una tabla nueva nace SIN privilegios para `authenticated`.** El
+14. **Ante un enrutado ambiguo NO se adivina.** Dos perfiles que normalizan
+    igual dejan el archivo sin asignar. Mandarlo a la modelo equivocada es peor:
+    sin asignar alguien lo revisa, mal asignado nadie lo hace y acaba publicado
+    en la cuenta que no era.
+
+15. **Un duplicado se marca, nunca se descarta en silencio.** La fila se conserva
+    con el motivo y el enlace al original. Lo que si se borra es la segunda copia
+    de los bytes en R2.
+
+16. **Un archivo sin perfil no se descarga.** Sin perfil no hay carpeta de R2, y
+    traer gigabytes que nadie reclamo es trabajo tirado.
+
+17. **Los workers de Node entran por `public.claim_jobs`, no por `app.claim_jobs`.**
+    PostgREST solo expone `public`. El envoltorio delega y no duplica logica, y
+    esta concedido solo a `service_role`.
+
+18. **Una tabla nueva nace SIN privilegios para `authenticated`.** El
     `grant ... on all tables` de la migracion 000900 solo alcanzo a las que
     existian entonces; el sintoma es un "permission denied" que no menciona el
     RLS por ningun lado. La migracion 001200 dejo puesto un
@@ -112,8 +128,8 @@ docker ────┘
 ```
 
 `rls` levanta un PostgreSQL 16 de servicio, aplica el arranque de auth que
-reproduce lo que Supabase da de fabrica, corre las trece migraciones y ejecuta las
-78 aserciones.
+reproduce lo que Supabase da de fabrica, corre las quince migraciones y ejecuta las
+88 aserciones.
 
 La compuerta `docker` construye las dos imagenes de verdad. Existe porque el
 despliegue es por contenedores: un Dockerfile roto no se descubriria al hacer
@@ -130,6 +146,10 @@ merge sino al intentar desplegar.
 | `src/lib/captions/validator.ts` | Filtro estricto y el tipo `PublishableCaption` |
 | `src/lib/captions/provider.ts` | Interfaz del generador; hoy un simulado |
 | `src/lib/captions/pipeline.ts` | Generar -> validar -> reintentar -> fallar cerrado |
+| `src/lib/connectors/routing.ts` | Enrutado hibrido, codigo puro |
+| `src/lib/connectors/connection.ts` | Unico camino de entrada y salida de los tokens de nube |
+| `src/workers/ingest/` | Worker de ingesta en Node |
+| `tsconfig.workers.json` | Sustituye `server-only` para ejecutar fuera de Next |
 | `src/lib/crypto/secrets.ts` | Cifrado AES-256-GCM, formato versionado `v1.` |
 | `src/lib/credentials.ts` | Unico camino de entrada y salida de los tokens |
 | `src/lib/rate-limit.ts` | Ventana fija en memoria y hash de IP |
@@ -145,7 +165,7 @@ merge sino al intentar desplegar.
 | Modulo | Estado |
 |---|---|
 | 1 — Roles y aislamiento | Completo y probado |
-| 2 — Ingesta y vault | Subidas completas. Conectores: esquema y RLS listos, sin logica de APIs (`docs/CONECTORES.md`) |
+| 2 — Ingesta y vault | Subidas y Dropbox completos (OAuth, escaneo, enrutado, dedupe). Falta Google Drive y la pantalla de triaje |
 | 3 — Pipeline de medios | Workers escritos; solo la sanitizacion EXIF esta verificada |
 | 4 — Hard Rule | Motor y validador de textos completos y probados. Falta conectar un proveedor de IA real |
 | 5 — Distribucion | Modelado en la base; **ningun runner implementado** |
@@ -159,16 +179,6 @@ merge sino al intentar desplegar.
   la autoritativa en PostgreSQL.
 - ~~Falta la funcion de cifrado de credenciales~~ → `src/lib/crypto/secrets.ts`,
   con 20 pruebas centradas en la deteccion de manipulacion.
-
-## Pendiente de decision del arquitecto
-
-- **Empezar los conectores por Dropbox.** Su OAuth es mas simple, acota la app a
-  una carpeta y no exige revision previa; serviria para validar la tuberia
-  mientras corre el tramite de verificacion de Google, que tarda semanas.
-- **Asignacion automatica de archivos a una modelo** cuando una carpeta
-  compartida tiene varias.
-- **Que hacer con los duplicados detectados por checksum:** descartar solos o
-  dejar marcados.
 
 ## Riesgos abiertos
 
@@ -191,3 +201,8 @@ merge sino al intentar desplegar.
 - **Los diccionarios de terminos penalizados son heuristicas observadas**, no
   reglas publicadas. Ninguna plataforma documenta su lista; habra que ajustarlos
   cuando cambie el comportamiento real.
+- **La integracion con Dropbox no se ha ejecutado nunca contra la API real.** El
+  entorno de desarrollo no alcanza internet. La primera conexion de verdad sigue
+  siendo la prueba que falta.
+- **El escaneo hay que encolarlo a mano.** Falta decidir la cadencia y quien
+  dispara `scan_cloud_folder`.

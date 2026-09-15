@@ -19,6 +19,9 @@ export default defineConfig({
       ENCRYPTION_MASTER_KEY:
         '1f8b3d5a7c9e0b2d4f6a8c1e3b5d7f9a0c2e4b6d8f1a3c5e7b9d0f2a4c6e8b1d',
       CLICK_IP_SALT: 'sal-de-pruebas-0123456789',
+      DROPBOX_APP_KEY: 'clave-de-app-de-pruebas',
+      DROPBOX_APP_SECRET: 'secreto-de-app-de-pruebas',
+      OAUTH_STATE_SECRET: 'f'.repeat(64),
     },
   },
   resolve: {

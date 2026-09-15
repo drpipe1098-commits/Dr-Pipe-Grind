@@ -115,5 +115,75 @@ select tests.assert(
     where id = '00000000-0000-0000-0000-000000000d01'),
   'la conexion apunta al perfil destino por defecto');
 
+\echo '== O. Enrutado, duplicados y acceso a la cola =='
+
+reset role;
+select tests.assert_rejected(
+  'update public.cloud_ingest_items set content_sha256 = ''no-es-un-hash''
+     where remote_file_id = ''drive-file-001''',
+  'content_sha256 solo acepta un SHA-256 en hexadecimal');
+
+select tests.assert_rejected(
+  'update public.cloud_ingest_items set assignment_source = ''adivinado''
+     where remote_file_id = ''drive-file-001''',
+  'assignment_source solo acepta default, folder_match o manual');
+
+-- Un duplicado NO se descarta: se conserva con el enlace al original, para que
+-- el panel pueda explicar por que ese archivo no se publicara otra vez.
+select tests.assert_affects(
+  'update public.cloud_ingest_items
+      set status = ''duplicate'',
+          duplicate_of_item_id = (select id from public.cloud_ingest_items
+                                   where remote_file_id = ''drive-file-001''),
+          skip_reason = ''mismo contenido que un archivo ya ingerido''
+    where remote_file_id = ''drive-file-002''', 1,
+  'un duplicado se marca y apunta al original, en vez de desaparecer');
+
+select tests.assert(
+  (select duplicate_of_item_id is not null and skip_reason is not null
+     from public.cloud_ingest_items where remote_file_id = 'drive-file-002'),
+  'el duplicado conserva el motivo y el enlace al original');
+
+-- La cola es de los workers. Un cliente con sesion no puede tomar trabajos.
+select set_config('request.jwt.claims', json_build_object('sub', :'studio_a')::text, false);
+set role authenticated;
+select tests.assert_rejected(
+  'select * from public.claim_jobs(''intruso'', 1)',
+  'un usuario con sesion NO puede tomar trabajos de la cola');
+select tests.assert_rejected(
+  'select public.complete_job(gen_random_uuid(), true)',
+  'un usuario con sesion NO puede cerrar trabajos');
+
+reset role;
+set role anon;
+select tests.assert_rejected(
+  'select * from public.claim_jobs(''intruso'', 1)',
+  'un anonimo tampoco alcanza la cola');
+
+reset role;
+insert into public.jobs (organization_id, job_type, payload)
+values ('00000000-0000-0000-0000-0000000000aa', 'scan_cloud_folder',
+        jsonb_build_object('connection_id', '00000000-0000-0000-0000-000000000d01'));
+
+-- Recorrido real del worker de Node: tomar por el envoltorio publico y cerrar.
+-- Comprobar solo el permiso dejaria sin verificar que el envoltorio delega bien
+-- en `app.claim_jobs`, que es donde vive el SKIP LOCKED.
+set role service_role;
+select tests.assert_count(
+  'select * from public.claim_jobs(''ingest-1'', 5, array[''scan_cloud_folder'']::public.job_type[])', 1,
+  'service_role toma el trabajo de escaneo por el envoltorio publico');
+
+select tests.assert_count(
+  'select * from public.claim_jobs(''ingest-2'', 5, array[''scan_cloud_folder'']::public.job_type[])', 0,
+  'un segundo worker no recibe el mismo trabajo: el SKIP LOCKED sigue vigente');
+
+select public.complete_job(
+  (select id from public.jobs where claimed_by = 'ingest-1' limit 1), true);
+
+reset role;
+select tests.assert(
+  (select status = 'done' from public.jobs where claimed_by = 'ingest-1' limit 1),
+  'cerrar por el envoltorio deja el trabajo en done');
+
 \echo ''
 \echo 'Conectores: todas las aserciones pasaron.'

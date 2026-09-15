@@ -9,7 +9,7 @@ Contexto durable en `AGENTS.md` y `docs/`.
 
 ---
 
-## Estado: Sprint 2, Fase 1 — Validador de textos
+## Estado: Sprint 2, Fase 2 — Ingesta desde Dropbox
 
 Lo que existe y esta verificado:
 
@@ -42,8 +42,10 @@ Lo que existe y esta verificado:
   fallar cerrado, con filtro estricto de terminos, enlaces, longitud y formato
   por plataforma. La garantia de que nada del LLM llega al publicador sin filtrar
   la impone el compilador, no una convencion.
-- **Esquema de conectores de nube (Modulo 2).** Tablas, RLS y tipos para Google
-  Drive y Dropbox. Sin logica de APIs todavia: ver `docs/CONECTORES.md`.
+- **Ingesta desde Dropbox (Modulo 2).** OAuth2 con `state` firmado, escaneo
+  incremental por cursor, enrutado hibrido a perfiles, deduplicacion en dos pasos
+  e ingesta en flujo a R2. Google Drive queda pendiente del tramite de
+  verificacion: ver `docs/CONECTORES.md`.
 
 ### Validacion
 
@@ -51,8 +53,8 @@ Lo que existe y esta verificado:
 |---|---|
 | ESLint | limpio |
 | TypeScript estricto | limpio |
-| Unidad (Hard Rule, cifrado, limite, textos) | 117/117 |
-| Aislamiento RLS, limite y conectores | 78/78 contra PostgreSQL 16 |
+| Unidad (Hard Rule, cifrado, limite, textos, conectores) | 141/141 |
+| Aislamiento RLS, limite, conectores y cola | 88/88 contra PostgreSQL 16 |
 | Build de produccion | correcto, 8 rutas y middleware |
 | Barrera anti-doxxing | GPS 4 campos → 0, pixeles intactos |
 | Imagenes Docker | se construyen en CI |
@@ -96,6 +98,8 @@ src/
   app/api/uploads/       Emision de URLs prefirmadas
   lib/scheduling/        Motor Hard Rule (codigo puro, sin dependencias)
   lib/captions/          Validador de textos y tuberia del Modulo 4
+  lib/connectors/        Dropbox, enrutado, ciclo de vida de conexiones
+  workers/ingest/        Worker de ingesta desde la nube (Node)
   lib/crypto/            Cifrado AES-256-GCM de credenciales
   lib/credentials.ts     Unico camino de entrada y salida de los tokens
   lib/rate-limit.ts      Ventana fija y hash de IP
@@ -103,24 +107,24 @@ src/
   lib/r2.ts              Cloudflare R2 por API S3
   middleware.ts          Redirector de enlaces cortos, i18n y sesion
 supabase/
-  migrations/            Trece migraciones en orden
-  tests/                 78 aserciones de aislamiento, compuertas, limite y conectores
+  migrations/            Quince migraciones en orden
+  tests/                 88 aserciones de aislamiento, compuertas, limite y conectores
 workers/                 Pipeline de medios en Python
-tests/                   117 pruebas de unidad
+tests/                   141 pruebas de unidad
 docs/                    Arquitectura, instalacion, base de datos, pruebas, despliegue
 Dockerfile               Imagen del panel (Next standalone)
-workers/Dockerfile       Imagen de los workers (con FFmpeg)
+workers/Dockerfile       Imagen de los workers de medios (con FFmpeg)
+workers/ingest.Dockerfile Imagen del worker de ingesta (Node, sin FFmpeg)
 docker-compose.yml       Orquestacion para VPS propio
 ```
 
 ## Siguiente entrega
 
-Pendiente de aprobacion:
-
-1. **Fase 2 del Sprint 2** — logica OAuth2 y APIs de Google Drive y Dropbox.
-   El esquema ya esta; el diseño y las decisiones delicadas, en `docs/CONECTORES.md`.
-2. **Conectar un proveedor de IA real** al generador de textos. La interfaz esta
-   lista y el simulado cubre las pruebas.
+1. **Primera conexion real a Dropbox.** Nada de la integracion se ha ejecutado
+   contra la API: el entorno de desarrollo no alcanza internet.
+2. **Pantalla de triaje** para los archivos que quedan sin asignar.
+3. **Google Drive**, en cuanto avance el tramite de verificacion.
+4. **Conectar un proveedor de IA real** al generador de textos.
 
 El Modulo 5 (runners de publicacion a Telegram, X, Reddit y Bluesky) sigue
 modelado en la base pero sin implementar. Ver `AGENTS.md`.

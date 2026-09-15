@@ -65,5 +65,15 @@ begin
 end;
 $$;
 
-grant usage on schema tests to authenticated, anon;
-grant execute on all functions in schema tests to authenticated, anon;
+-- En un proyecto Supabase real, `service_role` tiene acceso completo al esquema
+-- publico ademas de BYPASSRLS. El arranque de pruebas lo reproduce aqui, ya
+-- aplicadas las migraciones: sin esto, una prueba que actue como worker chocaria
+-- con un "permission denied" que no existe en produccion y llevaria a debilitar
+-- la configuracion real para que pasara.
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+
+-- `service_role` incluido: las pruebas de la cola se ejecutan con ese rol,
+-- que es el que usan los workers de Node.
+grant usage on schema tests to authenticated, anon, service_role;
+grant execute on all functions in schema tests to authenticated, anon, service_role;

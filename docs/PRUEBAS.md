@@ -7,11 +7,11 @@ las agrega.
 |---|---|---|
 | `linters` | ESLint sobre todo el proyecto | `npm run lint` |
 | `typescript` | `tsc --noEmit` en modo estricto | `npm run typecheck` |
-| `unidad` | 117 casos: Hard Rule, cifrado, limite de tasa y textos | `npm test` |
-| `aislamiento RLS` | 78 aserciones contra PostgreSQL real | `npm run test:rls` |
+| `unidad` | 141 casos: Hard Rule, cifrado, limite, textos y conectores | `npm test` |
+| `aislamiento RLS` | 88 aserciones contra PostgreSQL real | `npm run test:rls` |
 | `build` | Compilacion de produccion de Next | `npm run build` |
 | `workers python` | Sintaxis y la barrera anti-doxxing | `python workers/verificar_sanitizacion.py` |
-| `imagenes docker` | Construye las dos imagenes y valida el compose | `docker compose build` |
+| `imagenes docker` | Construye las tres imagenes y valida el compose | `docker compose build` |
 
 ## Por que se prueba esto y no otra cosa
 
@@ -52,6 +52,12 @@ es una cadena con una marca que solo produce el validador, y la prueba incluye u
 `npm run typecheck` fallaria por directiva inutil. Comprobado quitando la marca a
 proposito — la prueba falla, como debe.
 
+**El enrutado de la ingesta** (14 casos) importa porque su fallo es invisible.
+Si un archivo acaba en el perfil equivocado, el sistema cree que acerto y nadie
+lo revisa: el material de una modelo termina publicado en la cuenta de otra. Por
+eso el enrutado es codigo puro, sin base ni red, y por eso ante dos perfiles que
+normalizan igual se niega a adivinar.
+
 **El RLS** es la unica pieza cuyo fallo no tiene vuelta atras. Si una politica
 esta mal, el material privado de una modelo aparece en el panel de otra agencia,
 y eso ya no se deshace. Las pruebas no se limitan a comprobar que cada usuario ve
@@ -86,5 +92,9 @@ esperar una excepcion. Comprobarlo con un `assert_rejected` daria un falso verde
 - **Las imagenes Docker se construyen en CI, no en local.** La politica de red
   del entorno de desarrollo bloquea el registro de Docker Hub, asi que la
   comprobacion de que compilan ocurre en GitHub Actions.
+- **El cliente HTTP de Dropbox no se ha ejecutado contra la API real.** El
+  entorno de desarrollo no alcanza internet. Lo probado es el enrutado, el estado
+  de OAuth2, el filtro de tipos y el recorrido de la cola; el intercambio de
+  tokens, el listado y la descarga siguen sin comprobar contra Dropbox.
 - **Ningun runner de publicacion existe todavia.** El Modulo 5 esta modelado en
   la base pero no implementado.

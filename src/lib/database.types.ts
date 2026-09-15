@@ -38,7 +38,18 @@ export type ComplianceStatus = 'pending' | 'verified' | 'expired' | 'rejected';
 export type PayoutStatus = 'pending' | 'approved' | 'paid' | 'disputed';
 export type CloudProvider = 'google_drive' | 'dropbox';
 export type CloudConnectionStatus = 'active' | 'expired' | 'revoked' | 'error';
-export type CloudItemStatus = 'discovered' | 'queued' | 'ingested' | 'skipped' | 'failed';
+export type CloudItemStatus =
+  | 'discovered'
+  /** Descubierto pero sin perfil: espera triaje manual. No se descarga. */
+  | 'unassigned'
+  | 'queued'
+  | 'ingested'
+  /** Mismo contenido que otro ya registrado. Se conserva para poder explicarlo. */
+  | 'duplicate'
+  | 'skipped'
+  | 'failed';
+
+export type AssignmentSource = 'default' | 'folder_match' | 'manual';
 
 export type OrganizationRow = {
   id: string;
@@ -280,6 +291,11 @@ export type CloudIngestItemRow = {
   last_error: string | null;
   profile_id: string | null;
   media_asset_id: string | null;
+  /** SHA-256 del contenido, calculado al descargar. Comparable entre proveedores. */
+  content_sha256: string | null;
+  duplicate_of_item_id: string | null;
+  assignment_source: AssignmentSource | null;
+  matched_folder: string | null;
   discovered_at: string;
   ingested_at: string | null;
 };
@@ -317,6 +333,14 @@ export type Database = {
       resolve_tracking_link: {
         Args: { p_slug: string };
         Returns: { destination_url: string }[];
+      };
+      claim_jobs: {
+        Args: { p_worker: string; p_batch?: number; p_types?: JobType[] | null };
+        Returns: JobRow[];
+      };
+      complete_job: {
+        Args: { p_job_id: string; p_success: boolean; p_error?: string | null };
+        Returns: undefined;
       };
       record_link_click: {
         Args: {
