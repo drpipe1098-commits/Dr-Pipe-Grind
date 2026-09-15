@@ -59,7 +59,8 @@ Y dos más, fuera del código de producto:
 - **VALIDADO EN CÓDIGO** localmente: los **10 candados** pasan (`npm test`), con los 3 nuevos sumando la extracción de PDF en sus cuatro formas, el reconocimiento de hoja de vida y los filtros de vacantes.
 - El extractor y el reconocedor se probaron además contra **una hoja de vida real en PDF** generada por WeasyPrint, fuera del repositorio: 2 páginas, 16 campos reconocidos, 4 cargos con sus fechas y funciones correctas, y 14 campos correctamente vacíos por no estar en el documento. Los cuatro fallos listados arriba salieron de esa corrida.
 - Los filtros se probaron contra un archivo de vacantes ficticias: de 5 avisos, descartó el que exige inglés B2 conversacional y el presencial de bajo salario con trabajo en terreno, y dejó pasar el que solo pide inglés técnico de lectura.
-- Pendiente de las compuertas del PR: **POSTULA CI / validate**, que con este arreglo corre por primera vez.
+- **POSTULA CI corrió por primera vez en la historia del proyecto** y quedó en verde: `contratos`, `navegador` y `validate`, más `README Deploy Snapshot`. Antes de esta entrega el workflow ni siquiera arrancaba.
+- La compuerta `navegador` falló en su primera corrida real y resultó ser **intermitente**: la misma commit dio rojo por `push` y verde por `pull_request`. El navegador ahora usa perfil propio y puerto asignado por el sistema, y un fallo explica por qué.
 - **NO está validado en uso real.** El perfil generado todavía no se ha importado en un navegador ni se ha usado para postularse en un portal real.
 
 ## Qué sigue
