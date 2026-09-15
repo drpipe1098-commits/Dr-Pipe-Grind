@@ -1,11 +1,39 @@
-# Nunca subir datos personales de nadie.
-*.pdf
-mi-perfil-postula.json
-perfil*.json
-hoja-de-vida*
-hv-*
-*.docx
-
+# dependencias
 node_modules/
+.pnp
+.pnp.js
+
+# build de next
+.next/
+out/
+build/
+next-env.d.ts
+
+# entorno — NUNCA commitear credenciales reales
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+
+# sistema operativo y editores
 .DS_Store
-*.zip
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# artefactos de prueba y medios locales
+coverage/
+tmp/
+media-local/

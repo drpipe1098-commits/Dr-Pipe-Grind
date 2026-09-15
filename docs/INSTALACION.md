@@ -1,62 +1,85 @@
-# Instalar POSTULA (sin conocimientos técnicos)
+# Puesta en marcha local
 
-POSTULA no se descarga de ninguna tienda todavía. Se instala como «extensión sin empaquetar», que es la forma normal de probar una extensión propia. No requiere permisos de administrador y no cuesta nada.
+Nada de esto necesita cuentas en la nube. Supabase corre en local con su CLI y
+R2 se simula con MinIO; el codigo es el mismo que correra en produccion.
 
-Sirve en **Chrome, Edge, Brave y Opera**. Los pasos son iguales en los cuatro.
+## Requisitos
 
-## 1. Descargar el proyecto
+- Node.js 22 o superior
+- Docker (para Supabase local y MinIO)
+- Python 3.11 y FFmpeg, solo si vas a tocar los workers
 
-1. Entra al repositorio en GitHub.
-2. Botón verde **Code** → **Download ZIP**.
-3. Descomprime el ZIP donde quieras, por ejemplo en `Documentos\POSTULA`.
+## Pasos
 
-Adentro hay una carpeta llamada `extension`. Esa es la que importa.
+```bash
+# 1. Dependencias
+npm install
 
-## 2. Cargar la extensión
+# 2. Supabase local (PostgreSQL, Auth, PostgREST)
+npx supabase start
+# Anota la anon key y la service_role key que imprime.
 
-1. Abre el navegador y escribe en la barra de direcciones: `chrome://extensions`
-   (en Edge es `edge://extensions`).
-2. Arriba a la derecha, activa **Modo de desarrollador**.
-3. Aparecen unos botones nuevos. Haz clic en **Cargar descomprimida**.
-3. Selecciona la carpeta `extension` (la carpeta completa, no un archivo de adentro).
-4. Ya aparece POSTULA en la lista.
+# 3. Almacenamiento simulado
+docker compose up -d minio minio-init
 
-## 3. Fijar el botón a la barra
+# 4. Variables de entorno
+cp .env.example .env.local
+# Pega las claves del paso 2. Genera el secreto de los enlaces de subida con:
+#   openssl rand -hex 32
 
-Al lado de la barra de direcciones hay un icono de pieza de rompecabezas. Haz clic ahí, busca POSTULA y presiona el alfiler. Así el botón queda siempre a la vista.
+# 5. Migraciones
+npx supabase db reset
 
-## 4. Llenar tu perfil (una sola vez)
+# 6. Arrancar
+npm run dev
+```
 
-1. Haz clic en el botón de POSTULA.
-2. **Editar mi perfil**.
-3. Llena tus datos con calma. Revisa **dos veces** el correo y el celular: se van a copiar en cientos de formularios.
-4. **Guardar**.
-5. **Descargar copia** y guarda ese archivo en un lugar seguro. Es tu respaldo y sirve para pasar tu perfil a otro computador.
+## Comprobar que todo funciona
 
-## 5. Usarlo
+```bash
+npm run validate     # lint + typecheck + hard-rule + RLS
+```
 
-1. Entra a cualquier portal de empleo y abre el formulario de postulación.
-2. Haz clic en el botón de POSTULA.
-3. **Rellenar este formulario**.
-4. Los campos que se llenaron quedan marcados en verde por unos segundos; los que quedaron pendientes, en naranja.
-5. **Revisa todo y envía tú.** POSTULA nunca envía por ti.
+`npm run test:rls` crea una base desechable, aplica las diez migraciones, siembra
+dos agencias e intenta activamente cruzar la frontera entre ellas. Es la
+comprobacion que hay que correr siempre que se toque una politica.
 
-## Preguntas frecuentes
+Si el runner no encuentra PostgreSQL, indicale la conexion:
 
-**¿Mis datos se suben a algún lado?**
-No. Viven dentro de tu navegador, en tu computador. POSTULA no tiene servidor y no tiene permiso para conectarse a internet.
+```bash
+RLS_TEST_ADMIN_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npm run test:rls
+```
 
-**¿Me pueden bloquear la cuenta del portal?**
-No, porque POSTULA no envía nada ni navega por ti. Solo escribe tus datos en un formulario que tú abriste, igual que si los escribieras a mano pero más rápido.
+Para inspeccionar la base de prueba en lugar de destruirla:
 
-**Se llenó un campo con el dato equivocado.**
-Corrígelo a mano y avísanos qué portal y qué campo era. Ese caso se agrega a las pruebas para que no vuelva a pasar.
+```bash
+RLS_TEST_KEEP=1 npm run test:rls
+```
 
-**No se llenó nada.**
-Puede ser un portal que arma el formulario de una forma distinta. Avisa cuál es: se le agrega una receta específica.
+## Workers
 
-**¿Sirve si el formulario está dentro de un recuadro (iframe)?**
-Sí. POSTULA revisa también los recuadros internos de la página.
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r workers/requirements.txt
+python workers/main.py                 # todos los tipos
+python workers/main.py sanitize_exif   # solo sanitizacion
+```
 
-**¿Cómo actualizo a una versión nueva?**
-Descarga el ZIP otra vez, reemplaza la carpeta y en `chrome://extensions` presiona el botón de recargar de POSTULA. Tu perfil no se borra.
+Verificar la barrera anti-doxxing tras tocar `sanitize.py`:
+
+```bash
+pip install Pillow piexif
+python workers/verificar_sanitizacion.py
+```
+
+## Notas de despliegue
+
+El destino elegido es Vercel + Supabase Cloud + R2. Dos cosas a resolver antes
+de la primera subida a produccion:
+
+1. **Los terminos de Vercel prohiben contenido adulto.** Conviene confirmarlo
+   con ellos o prever alojamiento alternativo; perder la cuenta con el producto
+   en marcha es un riesgo real en este nicho.
+2. **Los workers no caben en Vercel.** FFmpeg sobre video largo excede los
+   limites de ejecucion de una funcion serverless. Necesitan un VPS, Fly.io o
+   Railway con el contenedor de `workers/`.

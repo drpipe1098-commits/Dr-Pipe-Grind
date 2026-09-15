@@ -1,0 +1,72 @@
+{
+  "app": {
+    "name": "MediaVault",
+    "tagline": "Content vault, automated distribution and traffic funnels"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "vault": "Vault",
+    "schedule": "Schedule",
+    "links": "Links",
+    "analytics": "Analytics",
+    "finance": "Finance",
+    "compliance": "Compliance",
+    "models": "Models",
+    "organizations": "Organizations",
+    "jobs": "Processing",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "roles": {
+    "admin": "Platform admin",
+    "studio": "Studio",
+    "model": "Model",
+    "editor": "Editor"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "signInCta": "Sign in",
+    "invalidCredentials": "Wrong email or password",
+    "signedOut": "Signed out"
+  },
+  "home": {
+    "heading": "MediaVault & Traffic Engine",
+    "body": "Multi-tenant platform for studios and independent models.",
+    "cta": "Open dashboard"
+  },
+  "dashboard": {
+    "welcome": "Hi, {name}",
+    "adminTitle": "Platform dashboard",
+    "studioTitle": "Studio dashboard",
+    "modelTitle": "My dashboard",
+    "empty": "Nothing to show yet."
+  },
+  "metrics": {
+    "assets": "Assets in vault",
+    "pendingSanitize": "Pending sanitization",
+    "scheduled": "Scheduled posts",
+    "clicks": "Clicks this period",
+    "models": "Active models",
+    "organizations": "Organizations",
+    "grossAmount": "Gross revenue",
+    "netAmount": "Model net",
+    "agencyFee": "Agency fee",
+    "deadJobs": "Failed jobs"
+  },
+  "compliance": {
+    "status": "Record status",
+    "verified": "Verified",
+    "pending": "Pending",
+    "expired": "Expired",
+    "rejected": "Rejected",
+    "blocked": "Publishing blocked: 2257 record unverified or expired.",
+    "expiresOn": "Expires on {date}"
+  },
+  "errors": {
+    "unauthorized": "You do not have access to this section.",
+    "notFound": "Not found.",
+    "generic": "Something went wrong. Please try again."
+  }
+}

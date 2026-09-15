@@ -1,0 +1,72 @@
+{
+  "app": {
+    "name": "MediaVault",
+    "tagline": "Vault de contenido, distribucion automatizada y embudos de trafico"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "vault": "Vault",
+    "schedule": "Programacion",
+    "links": "Enlaces",
+    "analytics": "Analitica",
+    "finance": "Finanzas",
+    "compliance": "Cumplimiento",
+    "models": "Modelos",
+    "organizations": "Organizaciones",
+    "jobs": "Procesamiento",
+    "settings": "Ajustes",
+    "signOut": "Cerrar sesion"
+  },
+  "roles": {
+    "admin": "Admin de plataforma",
+    "studio": "Estudio",
+    "model": "Modelo",
+    "editor": "Editor"
+  },
+  "auth": {
+    "signIn": "Iniciar sesion",
+    "email": "Correo electronico",
+    "password": "Contrasena",
+    "signInCta": "Entrar",
+    "invalidCredentials": "Correo o contrasena incorrectos",
+    "signedOut": "Sesion cerrada"
+  },
+  "home": {
+    "heading": "MediaVault & Traffic Engine",
+    "body": "Plataforma multi-tenant para estudios y modelos independientes.",
+    "cta": "Entrar al panel"
+  },
+  "dashboard": {
+    "welcome": "Hola, {name}",
+    "adminTitle": "Panel de plataforma",
+    "studioTitle": "Panel del estudio",
+    "modelTitle": "Mi panel",
+    "empty": "Todavia no hay datos que mostrar."
+  },
+  "metrics": {
+    "assets": "Assets en el vault",
+    "pendingSanitize": "Pendientes de sanitizar",
+    "scheduled": "Publicaciones programadas",
+    "clicks": "Clics del periodo",
+    "models": "Modelos activas",
+    "organizations": "Organizaciones",
+    "grossAmount": "Facturado bruto",
+    "netAmount": "Neto de la modelo",
+    "agencyFee": "Comision de agencia",
+    "deadJobs": "Trabajos fallidos"
+  },
+  "compliance": {
+    "status": "Estado del expediente",
+    "verified": "Verificado",
+    "pending": "Pendiente",
+    "expired": "Caducado",
+    "rejected": "Rechazado",
+    "blocked": "Publicacion bloqueada: expediente 2257 sin verificar o caducado.",
+    "expiresOn": "Vence el {date}"
+  },
+  "errors": {
+    "unauthorized": "No tienes acceso a esta seccion.",
+    "notFound": "No encontrado.",
+    "generic": "Algo salio mal. Intenta de nuevo."
+  }
+}

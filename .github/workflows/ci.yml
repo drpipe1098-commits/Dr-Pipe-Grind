@@ -1,107 +1,154 @@
-name: POSTULA CI
-run-name: POSTULA CI · ${{ github.event_name }} · ${{ github.ref_name }}
+name: MediaVault CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
-    branches: [main]
-  workflow_dispatch:
 
-permissions:
-  contents: read
-
+# Una sola corrida por rama: un push nuevo cancela el anterior.
 concurrency:
-  group: postula-ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_VERSION: '22'
+
 jobs:
-  contratos:
-    name: contratos
+  # ---------------------------------------------------------------------------
+  # Compuerta 1 — Linters
+  # ---------------------------------------------------------------------------
+  lint:
+    name: linters
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
 
-      - name: Contexto de la corrida
-        run: |
-          {
-            echo "## POSTULA CI"
-            echo ""
-            echo "- Evento: \`${{ github.event_name }}\`"
-            echo "- Rama: \`${{ github.ref_name }}\`"
-            echo "- SHA: \`${{ github.sha }}\`"
-            echo "- Node: \`$(node --version)\`"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Sintaxis de todos los archivos JavaScript
-        run: |
-          set -e
-          for archivo in $(find extension -name '*.js'); do
-            node --check "$archivo"
-            echo "ok $archivo"
-          done
-
-      - name: El manifiesto es JSON válido
-        run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"
-
-      - name: Candados de contrato
-        run: npm test
-
-      - name: La extensión no trae dependencias
-        run: |
-          test ! -d node_modules || (echo "No debe haber node_modules en el repositorio" && exit 1)
-          node -e "const p=require('./package.json'); if(p.dependencies||p.devDependencies){console.error('POSTULA no puede tener dependencias');process.exit(1)}"
-
-      - name: Resultado
-        if: always()
-        run: echo "- Resultado: \`${{ job.status }}\`" >> "$GITHUB_STEP_SUMMARY"
-
-  navegador:
-    name: navegador
+  # ---------------------------------------------------------------------------
+  # Compuerta 2 — TypeScript
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: typescript
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
 
-      - name: Navegador disponible en el runner
-        run: |
-          for binario in /usr/bin/google-chrome-stable /usr/bin/google-chrome /usr/bin/chromium-browser /usr/bin/chromium; do
-            if [ -x "$binario" ]; then
-              echo "POSTULA_CHROME=$binario" >> "$GITHUB_ENV"
-              echo "Navegador: $binario"
-              exit 0
-            fi
-          done
-          echo "No hay navegador en el runner; se instala chromium."
-          sudo apt-get update -qq && sudo apt-get install -y -qq chromium-browser || sudo apt-get install -y -qq chromium
-          echo "POSTULA_CHROME=$(command -v chromium-browser || command -v chromium)" >> "$GITHUB_ENV"
+  # ---------------------------------------------------------------------------
+  # Compuerta 3 — Matematica del Hard Rule
+  # ---------------------------------------------------------------------------
+  # El motor anti-repeticion decide que se publica y cuando. Un error de signo o
+  # de frontera aqui no rompe nada visible: simplemente repite contenido antes de
+  # tiempo, y eso solo se nota cuando el publico ya se canso.
+  hard-rule:
+    name: motor hard-rule
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
 
-      - name: Autorrelleno sobre formularios reales
+  # ---------------------------------------------------------------------------
+  # Compuerta 4 — Politicas RLS contra un PostgreSQL real
+  # ---------------------------------------------------------------------------
+  # La compuerta mas importante del proyecto. Levanta una base, aplica todas las
+  # migraciones e INTENTA activamente leer y escribir datos de otro inquilino.
+  # Un RLS mal escrito filtra el material privado de una modelo a otra agencia, y
+  # ese fallo no tiene vuelta atras.
+  rls:
+    name: aislamiento RLS
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
         env:
-          POSTULA_EXIGIR_NAVEGADOR: '1'
-        run: node tests/navegador-contract.mjs
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Instalar cliente de PostgreSQL
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Ejecutar pruebas de RLS
+        env:
+          RLS_TEST_ADMIN_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+        run: node scripts/run-rls-tests.mjs
 
+  # ---------------------------------------------------------------------------
+  # Compuerta 5 — Build de produccion
+  # ---------------------------------------------------------------------------
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Compilar
+        # Valores de marcador: el build no se conecta a nada, solo necesita que
+        # las variables publicas existan y tengan forma valida.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: clave-anonima-de-marcador-para-el-build
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Compuerta 6 — Workers de Python
+  # ---------------------------------------------------------------------------
+  workers:
+    name: workers python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Comprobar sintaxis
+        run: python -m compileall -q workers
+      - name: Verificar la barrera anti-doxxing
+        # Fabrica una foto con GPS, la sanitiza y exige que no quede ni un campo.
+        # Es la barrera que evita publicar el domicilio de una modelo.
+        run: |
+          pip install --quiet Pillow piexif
+          python workers/verificar_sanitizacion.py
+
+  # ---------------------------------------------------------------------------
+  # Agregador: es la unica comprobacion que hay que exigir en la rama principal.
+  # ---------------------------------------------------------------------------
   validate:
     name: validate
-    needs: [contratos, navegador]
     runs-on: ubuntu-latest
+    needs: [lint, typecheck, hard-rule, rls, build, workers]
     if: always()
     steps:
-      - name: Agregado de compuertas obligatorias
+      - name: Verificar que todas las compuertas pasaron
         run: |
-          if [ "${{ needs.contratos.result }}" != "success" ]; then
-            echo "La compuerta «contratos» no pasó."
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "Alguna compuerta fallo."
             exit 1
           fi
-          if [ "${{ needs.navegador.result }}" != "success" ]; then
-            echo "La compuerta «navegador» no pasó."
-            exit 1
-          fi
-          echo "Todas las compuertas de POSTULA CI pasaron."
+          echo "Las 6 compuertas pasaron."

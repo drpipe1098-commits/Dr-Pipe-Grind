@@ -1,0 +1,40 @@
+# Infraestructura local de desarrollo.
+#
+# Supabase NO va aqui: se levanta con su propia CLI (`npx supabase start`), que
+# arranca PostgreSQL, Auth, PostgREST y Storage con la configuracion correcta.
+# Esto solo cubre lo que la CLI no trae: un R2 simulado.
+services:
+  # MinIO habla la misma API S3 que Cloudflare R2, asi que el codigo de
+  # `src/lib/r2.ts` y el de los workers funciona sin cambios contra los dos.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '9000:9000'   # API S3
+      - '9001:9001'   # Consola web
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Crea el bucket al arrancar para no tener que hacerlo a mano.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb --ignore-existing local/mediavault-dev &&
+      echo 'bucket mediavault-dev listo'
+      "
+
+volumes:
+  minio-data:
