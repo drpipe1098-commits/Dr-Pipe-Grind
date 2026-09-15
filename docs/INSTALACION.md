@@ -24,8 +24,10 @@ docker compose up -d minio minio-init
 
 # 4. Variables de entorno
 cp .env.example .env.local
-# Pega las claves del paso 2. Genera el secreto de los enlaces de subida con:
-#   openssl rand -hex 32
+# Pega las claves del paso 2 y genera los tres secretos:
+#   openssl rand -hex 32   -> UPLOAD_LINK_SECRET
+#   openssl rand -hex 32   -> ENCRYPTION_MASTER_KEY  (64 caracteres exactos)
+#   openssl rand -hex 16   -> CLICK_IP_SALT
 
 # 5. Migraciones
 npx supabase db reset
@@ -72,14 +74,13 @@ pip install Pillow piexif
 python workers/verificar_sanitizacion.py
 ```
 
-## Notas de despliegue
+## Levantar todo con contenedores
 
-El destino elegido es Vercel + Supabase Cloud + R2. Dos cosas a resolver antes
-de la primera subida a produccion:
+Para probar la pila tal y como corre en produccion, sin instalar Node ni Python:
 
-1. **Los terminos de Vercel prohiben contenido adulto.** Conviene confirmarlo
-   con ellos o prever alojamiento alternativo; perder la cuenta con el producto
-   en marcha es un riesgo real en este nicho.
-2. **Los workers no caben en Vercel.** FFmpeg sobre video largo excede los
-   limites de ejecucion de una funcion serverless. Necesitan un VPS, Fly.io o
-   Railway con el contenedor de `workers/`.
+```bash
+cp .env.example .env
+docker compose --profile dev up --build
+```
+
+El detalle del despliegue en servidor propio esta en `docs/DESPLIEGUE.md`.

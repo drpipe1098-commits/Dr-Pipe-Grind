@@ -9,7 +9,7 @@ Contexto durable en `AGENTS.md` y `docs/`.
 
 ---
 
-## Estado: Entrega 1 — Cimientos
+## Estado: Entrega 1 — Cimientos + endurecimiento
 
 Lo que existe y esta verificado:
 
@@ -32,6 +32,12 @@ Lo que existe y esta verificado:
 - **Workers de Python.** Retirada de EXIF/GPS, transcodificacion H.264/WEBP y
   marca de agua, sobre una cola en Postgres con `SKIP LOCKED`.
 - **Bilingue.** Espanol e ingles con `next-intl` desde la primera entrega.
+- **Credenciales cifradas en reposo.** AES-256-GCM con clave del entorno y
+  contexto que ata cada criptograma a su organizacion y plataforma.
+- **Acortador con limite de tasa en dos capas.** Ventana en memoria del borde y
+  ventana autoritativa en PostgreSQL. De la IP solo se guarda su hash con sal.
+- **Despliegue en contenedores.** Imagen del panel (Next standalone) e imagen de
+  los workers (con FFmpeg), orquestadas para VPS propio.
 
 ### Validacion
 
@@ -39,14 +45,16 @@ Lo que existe y esta verificado:
 |---|---|
 | ESLint | limpio |
 | TypeScript estricto | limpio |
-| Hard Rule | 36/36 |
-| Aislamiento RLS | 53/53 contra PostgreSQL 16 |
+| Unidad (Hard Rule, cifrado, limite) | 75/75 |
+| Aislamiento RLS y limite de tasa | 65/65 contra PostgreSQL 16 |
 | Build de produccion | correcto, 8 rutas y middleware |
 | Barrera anti-doxxing | GPS 4 campos → 0, pixeles intactos |
+| Imagenes Docker | se construyen en CI |
 
 **Lo que NO esta validado:** nada se ha ejecutado contra Supabase Cloud ni
-Cloudflare R2 reales, no hay pruebas end-to-end en navegador y no existe todavia
-ningun runner que publique en una plataforma. Ver `docs/PRUEBAS.md`.
+Cloudflare R2 reales, no hay pruebas end-to-end en navegador, no existe todavia
+ningun runner que publique en una plataforma, y las imagenes Docker se compilan
+en CI pero no se han arrancado en un servidor. Ver `docs/PRUEBAS.md`.
 
 ---
 
@@ -61,7 +69,8 @@ npx supabase db reset         # aplica las diez migraciones
 npm run dev
 ```
 
-Detalle completo en `docs/INSTALACION.md`.
+Detalle completo en `docs/INSTALACION.md`. Para servidor propio con
+contenedores, `docs/DESPLIEGUE.md`.
 
 ## Comandos
 
@@ -69,8 +78,8 @@ Detalle completo en `docs/INSTALACION.md`.
 |---|---|
 | `npm run dev` | Servidor de desarrollo |
 | `npm run validate` | Lint + typecheck + Hard Rule + RLS |
-| `npm test` | Matematica del motor anti-repeticion |
-| `npm run test:rls` | Aislamiento multi-tenant contra PostgreSQL real |
+| `npm test` | Hard Rule, cifrado y limite de tasa |
+| `npm run test:rls` | Aislamiento multi-tenant y limite de tasa, contra PostgreSQL real |
 | `npm run build` | Build de produccion |
 
 ## Mapa del repositorio
@@ -80,19 +89,29 @@ src/
   app/[locale]/          Paneles por rol, login y pagina publica de subida
   app/api/uploads/       Emision de URLs prefirmadas
   lib/scheduling/        Motor Hard Rule (codigo puro, sin dependencias)
+  lib/crypto/            Cifrado AES-256-GCM de credenciales
+  lib/credentials.ts     Unico camino de entrada y salida de los tokens
+  lib/rate-limit.ts      Ventana fija y hash de IP
   lib/supabase/          Clientes: navegador, servidor y servicio
   lib/r2.ts              Cloudflare R2 por API S3
   middleware.ts          Redirector de enlaces cortos, i18n y sesion
 supabase/
-  migrations/            Diez migraciones en orden
-  tests/                 53 aserciones de aislamiento y compuertas
+  migrations/            Once migraciones en orden
+  tests/                 65 aserciones de aislamiento, compuertas y limite
 workers/                 Pipeline de medios en Python
-tests/                   36 pruebas del Hard Rule
-docs/                    Arquitectura, instalacion, base de datos, pruebas
+tests/                   75 pruebas de unidad
+docs/                    Arquitectura, instalacion, base de datos, pruebas, despliegue
+Dockerfile               Imagen del panel (Next standalone)
+workers/Dockerfile       Imagen de los workers (con FFmpeg)
+docker-compose.yml       Orquestacion para VPS propio
 ```
 
-## Siguiente entrega
+## Siguiente entrega (Sprint 2)
 
-El Modulo 5 (runners de publicacion a Telegram, X, Reddit y Bluesky) y el
-validador de textos del Modulo 4 estan modelados en la base pero sin implementar.
-Ver `AGENTS.md`.
+Aprobado por el arquitecto, pendiente de arrancar:
+
+1. Validador de textos del Modulo 4 (regex + motor de IA).
+2. Conectores de ingesta de Google Drive y Dropbox (Modulo 2).
+
+El Modulo 5 (runners de publicacion a Telegram, X, Reddit y Bluesky) sigue
+modelado en la base pero sin implementar. Ver `AGENTS.md`.

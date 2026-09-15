@@ -73,7 +73,7 @@ try {
   psql(TEST_URL, ['-f', 'supabase/tests/10_seed.sql']);
   log('datos de prueba sembrados\n');
 
-  for (const file of sqlFiles('supabase/tests').filter((f) => /\/(2|3)\d_/.test(f))) {
+  for (const file of sqlFiles('supabase/tests').filter((f) => /\/[2-9]\d_/.test(f))) {
     runTestFile(file);
   }
 

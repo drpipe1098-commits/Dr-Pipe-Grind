@@ -1,20 +1,107 @@
-# Infraestructura local de desarrollo.
+# =============================================================================
+# MediaVault — orquestacion de contenedores
+# =============================================================================
+# Despliegue en VPS propio (Hetzner u otro). Dos servicios de aplicacion:
 #
-# Supabase NO va aqui: se levanta con su propia CLI (`npx supabase start`), que
-# arranca PostgreSQL, Auth, PostgREST y Storage con la configuracion correcta.
-# Esto solo cubre lo que la CLI no trae: un R2 simulado.
+#   web     — el panel Next.js
+#   worker  — el pipeline de medios en Python, con FFmpeg
+#
+# Se separan porque tienen formas de carga opuestas: el panel atiende muchas
+# peticiones cortas y el worker pocas tareas muy largas y golosas de CPU. Meterlos
+# juntos haria que una transcodificacion dejara el panel sin respuesta, y ademas
+# impide escalarlos por separado (`--scale worker=4` sin tocar el panel).
+#
+# La base de datos y la autenticacion siguen en Supabase, que aporta Auth,
+# PostgREST y las copias de seguridad. Para autoalojarla tambien, usa el compose
+# oficial de Supabase en su propia pila y apunta aqui las variables.
+#
+# Desarrollo local (anade MinIO simulando R2):
+#   docker compose --profile dev up
+#
+# Produccion:
+#   docker compose up -d --build
+#
+# Delante hace falta un proxy inverso con TLS (Caddy o Traefik). No se incluye
+# aqui para no imponer uno: `web` escucha en el 3000 y espera recibir X-Forwarded-For.
+
 services:
-  # MinIO habla la misma API S3 que Cloudflare R2, asi que el codigo de
-  # `src/lib/r2.ts` y el de los workers funciona sin cambios contra los dos.
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_REGION: ${R2_REGION:-auto}
+      UPLOAD_LINK_SECRET: ${UPLOAD_LINK_SECRET}
+      UPLOAD_PRESIGN_TTL_SECONDS: ${UPLOAD_PRESIGN_TTL_SECONDS:-300}
+      UPLOAD_MAX_BYTES_PER_FILE: ${UPLOAD_MAX_BYTES_PER_FILE:-2147483648}
+      UPLOAD_MAX_FILES_PER_LINK: ${UPLOAD_MAX_FILES_PER_LINK:-50}
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      CLICK_IP_SALT: ${CLICK_IP_SALT}
+      CLICK_RATE_LIMIT_PER_MINUTE: ${CLICK_RATE_LIMIT_PER_MINUTE:-30}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/es').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+    restart: unless-stopped
+    environment:
+      # Conexion directa a PostgreSQL: los workers no pasan por PostgREST.
+      DATABASE_URL: ${DATABASE_URL}
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_REGION: ${R2_REGION:-auto}
+      WORKER_BATCH_SIZE: ${WORKER_BATCH_SIZE:-1}
+      WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-5}
+    # El nombre del worker sale del hostname del contenedor, que Docker hace
+    # unico por replica. Asi `claimed_by` identifica a cual toco cada trabajo
+    # incluso con `--scale worker=4`.
+    command: ['sh', '-c', 'WORKER_NAME=worker-$$(hostname) python main.py']
+    deploy:
+      resources:
+        limits:
+          # FFmpeg se come toda la CPU disponible si se le deja. Este tope evita
+          # que una transcodificacion deje al panel sin margen en el mismo VPS.
+          cpus: '2.0'
+          memory: 2G
+    tmpfs:
+      # Los temporales de FFmpeg viven en memoria y desaparecen con el
+      # contenedor: nunca queda material sin sanitizar en el disco del servidor.
+      - /tmp:size=8G
+
+  # --- Solo desarrollo -------------------------------------------------------
   minio:
+    profiles: ['dev']
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - '9000:9000'   # API S3
-      - '9001:9001'   # Consola web
+      - '9000:9000'
+      - '9001:9001'
     volumes:
       - minio-data:/data
     healthcheck:
@@ -23,8 +110,8 @@ services:
       timeout: 5s
       retries: 5
 
-  # Crea el bucket al arrancar para no tener que hacerlo a mano.
   minio-init:
+    profiles: ['dev']
     image: minio/mc:latest
     depends_on:
       minio:

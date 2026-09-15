@@ -6,6 +6,10 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Empaqueta el servidor con solo las dependencias que realmente usa. Sin esto
+  // la imagen tendria que llevar node_modules entero: cientos de megas de los
+  // que en ejecucion no se toca casi nada.
+  output: 'standalone',
   // El contenido de este producto no debe indexarse ni incrustarse en terceros.
   async headers() {
     return [

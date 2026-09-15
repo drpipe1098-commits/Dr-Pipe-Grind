@@ -16,6 +16,15 @@ const serverSchema = z.object({
   R2_ENDPOINT: z.string().url(),
   R2_REGION: z.string().default('auto'),
   UPLOAD_LINK_SECRET: z.string().min(32),
+  // 32 bytes en hexadecimal. Cifra los tokens de las plataformas en reposo.
+  ENCRYPTION_MASTER_KEY: z
+    .string()
+    .regex(
+      /^[0-9a-fA-F]{64}$/,
+      'ENCRYPTION_MASTER_KEY debe ser hexadecimal de 64 caracteres (openssl rand -hex 32)',
+    ),
+  // Sal del hash de IP del acortador. Se guarda el hash, nunca la IP.
+  CLICK_IP_SALT: z.string().min(16),
   UPLOAD_PRESIGN_TTL_SECONDS: z.coerce.number().int().positive().max(3600).default(300),
   UPLOAD_MAX_BYTES_PER_FILE: z.coerce.number().int().positive().default(2_147_483_648),
   UPLOAD_MAX_FILES_PER_LINK: z.coerce.number().int().positive().default(50),

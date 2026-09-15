@@ -1,18 +1,19 @@
 # Pruebas
 
-Seis compuertas en CI. La rama principal solo necesita exigir `validate`, que
+Siete compuertas en CI. La rama principal solo necesita exigir `validate`, que
 las agrega.
 
 | Compuerta | Que comprueba | Comando local |
 |---|---|---|
 | `linters` | ESLint sobre todo el proyecto | `npm run lint` |
 | `typescript` | `tsc --noEmit` en modo estricto | `npm run typecheck` |
-| `motor hard-rule` | 36 casos de la matematica anti-repeticion | `npm test` |
-| `aislamiento RLS` | 53 aserciones contra PostgreSQL real | `npm run test:rls` |
+| `unidad` | 75 casos: Hard Rule, cifrado y limite de tasa | `npm test` |
+| `aislamiento RLS` | 65 aserciones contra PostgreSQL real | `npm run test:rls` |
 | `build` | Compilacion de produccion de Next | `npm run build` |
 | `workers python` | Sintaxis y la barrera anti-doxxing | `python workers/verificar_sanitizacion.py` |
+| `imagenes docker` | Construye las dos imagenes y valida el compose | `docker compose build` |
 
-## Por que solo estas dos suites de unidad
+## Por que se prueba esto y no otra cosa
 
 El esfuerzo esta puesto donde un fallo no se ve venir.
 
@@ -23,6 +24,19 @@ cuando el publico ya se canso. Por eso las 36 pruebas insisten en los limites
 el enfriamiento de cero dias— y usan fechas fijas en UTC. Ninguna llama a
 `new Date()` sin argumentos: una prueba que dependa del reloj real falla sola
 algun martes y nadie sabe por que.
+
+**El cifrado de credenciales** (20 casos) se prueba sobre todo por lo que
+*rechaza*. Que el ida y vuelta funcione lo consigue cualquier implementacion,
+incluida una insegura; lo que distingue a AES-GCM de un modo sin autenticar es
+que detecte manipulacion. Por eso la mayoria de los casos alteran el texto
+cifrado, la etiqueta o el IV y exigen que falle, y otros comprueban que el
+contexto impide reutilizar el criptograma de una agencia en la fila de otra.
+
+**El limite de tasa** (19 casos entre unidad y base) importa porque sobre el
+conteo de clics se reparte dinero: inflarlo no es vandalismo, es fraude. Las
+aserciones de PostgreSQL se ejecutan como `anon`, que es exactamente el rol desde
+el que se intentaria, y comprueban ademas que omitir el hash de IP no sea una via
+de escape.
 
 **El RLS** es la unica pieza cuyo fallo no tiene vuelta atras. Si una politica
 esta mal, el material privado de una modelo aparece en el panel de otra agencia,
@@ -55,5 +69,8 @@ esperar una excepcion. Comprobarlo con un `assert_rejected` daria un falso verde
   gestionados no se han tocado.
 - **La transcodificacion y la marca de agua no tienen pruebas automaticas.**
   Solo la sanitizacion EXIF, que es la parte peligrosa.
+- **Las imagenes Docker se construyen en CI, no en local.** La politica de red
+  del entorno de desarrollo bloquea el registro de Docker Hub, asi que la
+  comprobacion de que compilan ocurre en GitHub Actions.
 - **Ningun runner de publicacion existe todavia.** El Modulo 5 esta modelado en
   la base pero no implementado.

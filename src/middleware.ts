@@ -2,6 +2,7 @@ import createIntlMiddleware from 'next-intl/middleware';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
 import { routing } from '@/i18n/routing';
+import { FixedWindowRateLimiter, clientIp, hashIp } from '@/lib/rate-limit';
 
 /**
  * Middleware unico del proyecto. Atiende tres cosas, en este orden:
@@ -17,6 +18,22 @@ import { routing } from '@/i18n/routing';
 const intlMiddleware = createIntlMiddleware(routing);
 
 const SLUG_PATTERN = /^[a-zA-Z0-9_-]{4,64}$/;
+
+/**
+ * Primera barrera contra la inflacion de contadores: corta las rafagas en el
+ * borde, antes de que lleguen a la base.
+ *
+ * No es la barrera autoritativa. Vive en la memoria de este proceso, asi que con
+ * varias replicas de `web` el limite efectivo se multiplica por el numero de
+ * replicas, y ademas se puede rodear llamando al RPC directamente. La barrera
+ * que de verdad cuenta es la de PostgreSQL, en `record_link_click`, que descarta
+ * clics repetidos de la misma IP sobre el mismo enlace dentro de una ventana.
+ * Esta solo evita el trabajo inutil.
+ */
+const clickLimiter = new FixedWindowRateLimiter(
+  Number(process.env.CLICK_RATE_LIMIT_PER_MINUTE ?? '30'),
+  60_000,
+);
 
 /** Familia del navegador a partir del User-Agent. */
 function uaFamily(userAgent: string | null): string {
@@ -83,16 +100,32 @@ async function handleShortLink(
     return notFound();
   }
 
-  // Registro asincrono: ya se decidio el destino, esto no bloquea la respuesta.
+  // El registro va en waitUntil: el visitante ya tiene su redireccion y no espera
+  // a que se cuente el clic. Perder una metrica es molesto; perder una conversion,
+  // no. Que ademas se limite la tasa aqui es un ahorro, no la garantia.
   event.waitUntil(
-    rpc('record_link_click', {
-      p_slug: slug,
-      p_country:
-        request.headers.get('x-vercel-ip-country') ??
-        request.headers.get('cf-ipcountry'),
-      p_referrer: request.headers.get('referer'),
-      p_ua_family: uaFamily(request.headers.get('user-agent')),
-    }).catch(() => undefined),
+    (async () => {
+      const salt = process.env.CLICK_IP_SALT ?? '';
+      const ip = clientIp(request.headers);
+
+      // Sin sal configurada no se calcula ningun hash. Enviar la IP en claro
+      // seria peor que no limitar: el proposito es no guardarla nunca.
+      const ipHash = salt === '' ? null : await hashIp(ip, salt);
+
+      if (ipHash !== null && !clickLimiter.check(ipHash).allowed) {
+        return;
+      }
+
+      await rpc('record_link_click', {
+        p_slug: slug,
+        p_country:
+          request.headers.get('x-vercel-ip-country') ??
+          request.headers.get('cf-ipcountry'),
+        p_referrer: request.headers.get('referer'),
+        p_ua_family: uaFamily(request.headers.get('user-agent')),
+        p_ip_hash: ipHash,
+      }).catch(() => undefined);
+    })(),
   );
 
   // 302 y sin cache: un 301 lo guardaria el navegador y los clics siguientes
