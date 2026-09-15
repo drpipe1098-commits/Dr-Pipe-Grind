@@ -42,6 +42,29 @@
     'usuario', 'user', 'clave', 'pin', 'codigo', 'token', 'id', 'donde', 'where'
   ];
 
+  /**
+   * Rótulos que describen LA VACANTE, no a la persona.
+   *
+   * «Habilidades requeridas para el cargo» pide lo que la empresa busca, no
+   * lo que tú sabes; «Años de experiencia requeridos» pide el mínimo del
+   * aviso, no el tuyo. Sin esto el motor los confunde con los campos del
+   * perfil y escribe tus datos en la descripción del puesto: una afirmación
+   * falsa sobre ti, puesta por POSTULA, en el formulario de un empleador.
+   *
+   * Se compara solo contra las señales directas del campo —su rótulo, su
+   * `name`, su `id`— y nunca contra el texto cercano, porque un encabezado
+   * de sección que diga «Requisitos» no puede dejar sin rellenar a los
+   * campos legítimos que estén debajo.
+   */
+  const EXCLUSIONES_DE_VACANTE = [
+    'requerid', 'requisitos', 'para el cargo', 'perfil del cargo',
+    'descripcion del cargo', 'de la vacante', 'que buscamos', 'buscamos',
+    'ofrecemos', 'solicitamos'
+  ];
+
+  /** Señales que vienen del campo mismo, no de lo que lo rodea. */
+  const SENALES_DIRECTAS = ['etiqueta', 'ariaLabel', 'placeholder', 'nombre', 'id'];
+
   /** autocomplete estándar del navegador: la pista más confiable que existe. */
   const AUTOCOMPLETE = {
     'name': 'nombreCompleto',
@@ -208,6 +231,21 @@
       veta: ['empresa', 'vacante', 'funciones del cargo'],
       tipos: ['textarea']
     },
+    habilidades: {
+      fuertes: ['habilidades', 'competencias', 'conocimientos', 'aptitudes',
+                'tecnologias', 'herramientas que manejas', 'skills', 'habilidades tecnicas',
+                'conocimientos tecnicos', 'areas de conocimiento'],
+      debiles: [],
+      veta: ['idioma', 'requeridas', 'requisitos', 'que buscamos', 'del cargo'],
+      tipos: ['textarea', 'text']
+    },
+    certificaciones: {
+      fuertes: ['certificaciones', 'certificados', 'cursos realizados', 'cursos y certificaciones',
+                'diplomados', 'formacion complementaria', 'otros estudios', 'certifications'],
+      debiles: ['cursos'],
+      veta: ['requeridas', 'requisitos', 'del cargo'],
+      tipos: ['textarea', 'text']
+    },
     anosExperiencia: {
       fuertes: ['anos de experiencia', 'años de experiencia', 'tiempo de experiencia',
                 'experiencia en anos', 'years of experience'],
@@ -359,6 +397,11 @@
       .some((clave) => EXCLUSIONES_EXACTAS.includes(senales[clave]));
     if (senalExcluyente) return null;
 
+    // El campo describe la vacante, no a la persona: no es suyo que llenar.
+    const describeLaVacante = SENALES_DIRECTAS.some((clave) =>
+      EXCLUSIONES_DE_VACANTE.some((frase) => N.contiene(senales[clave], frase)));
+    if (describeLaVacante) return null;
+
     // 2. autocomplete estándar: gana sobre cualquier heurística.
     const auto = String(d.autocomplete || '').toLowerCase().trim();
     if (AUTOCOMPLETE[auto]) {
@@ -379,6 +422,7 @@
   }
 
   raiz.POSTULA_Matcher = {
-    detectar, PATRONES, EXCLUSIONES, EXCLUSIONES_EXACTAS, AUTOCOMPLETE, UMBRAL
+    detectar, PATRONES, EXCLUSIONES, EXCLUSIONES_EXACTAS, EXCLUSIONES_DE_VACANTE,
+    AUTOCOMPLETE, UMBRAL
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

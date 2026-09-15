@@ -6,7 +6,9 @@
  * respetan la regla del proyecto de no tener dependencias.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const CANDIDATOS = [
   '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
@@ -41,24 +43,61 @@ function esperar(ms) {
   return new Promise((listo) => setTimeout(listo, ms));
 }
 
-async function puntoDeEntrada(puerto, intentos = 60) {
+/**
+ * El puerto real que abrió el navegador.
+ *
+ * Chrome escribe en `DevToolsActivePort`, dentro del perfil, el puerto que
+ * de verdad acabó usando. Preguntárselo al archivo en vez de asumir el que
+ * se pidió evita el fallo silencioso cuando ese puerto ya estaba ocupado:
+ * Chrome levanta igual, en otro puerto, y quien espera en el pedido se
+ * queda esperando hasta agotar el tiempo.
+ */
+function puertoReal(perfil, puertoPedido) {
+  try {
+    const archivo = join(perfil, 'DevToolsActivePort');
+    const primera = readFileSync(archivo, 'utf8').split('\n')[0].trim();
+    const leido = Number(primera);
+    if (Number.isInteger(leido) && leido > 0) return leido;
+  } catch { /* todavía no lo ha escrito */ }
+  return puertoPedido;
+}
+
+async function puntoDeEntrada(puertoPedido, perfil, diagnostico, intentos = 160) {
+  let ultimoError = null;
   for (let i = 0; i < intentos; i += 1) {
+    const puerto = puertoReal(perfil, puertoPedido);
     try {
       const respuesta = await fetch(`http://127.0.0.1:${puerto}/json/list`);
       const objetivos = await respuesta.json();
       const pagina = objetivos.find((o) => o.type === 'page' && o.webSocketDebuggerUrl);
       if (pagina) return pagina.webSocketDebuggerUrl;
-    } catch { /* todavía no levanta */ }
+    } catch (error) { ultimoError = error; }
     await esperar(250);
   }
-  throw new Error('El navegador no expuso su punto de depuración a tiempo.');
+  // Sin esto, un fallo en CI es indistinguible de cualquier otro: el error
+  // decía solo «no expuso su punto de depuración» y la salida del navegador
+  // se descartaba, así que no había forma de saber por qué.
+  const salida = diagnostico().trim();
+  throw new Error(
+    'El navegador no expuso su punto de depuración a tiempo.'
+    + `\n  binario: ${diagnostico.binario}`
+    + `\n  puerto pedido: ${puertoPedido}, puerto real: ${puertoReal(perfil, puertoPedido)}`
+    + `\n  último error de conexión: ${ultimoError ? ultimoError.message : 'ninguno'}`
+    + (salida ? `\n  salida del navegador:\n${salida.split('\n').map((l) => `    ${l}`).join('\n')}` : '\n  el navegador no escribió nada')
+  );
 }
 
 export async function abrirNavegador() {
   const binario = buscarNavegador();
   if (!binario) return null;
 
-  const puerto = 9500 + Math.floor(Math.random() * 400);
+  // Puerto 0 = que lo escoja el sistema. Un puerto fijo o aleatorio puede
+  // estar ocupado, y entonces Chrome abre otro sin avisar.
+  const puerto = 0;
+  // Un perfil nuevo por corrida: uno compartido en /tmp queda bloqueado por
+  // el Chrome anterior si no alcanzó a cerrarse, y el siguiente no levanta.
+  const perfil = mkdtempSync(join(tmpdir(), 'postula-chrome-'));
+
   const proceso = spawn(binario, [
     '--headless=new',
     `--remote-debugging-port=${puerto}`,
@@ -68,11 +107,25 @@ export async function abrirNavegador() {
     '--disable-dev-shm-usage',
     '--allow-file-access-from-files',
     '--no-first-run',
-    '--user-data-dir=/tmp/postula-chrome-pruebas',
+    '--no-default-browser-check',
+    `--user-data-dir=${perfil}`,
     'about:blank'
-  ], { stdio: 'ignore' });
+  ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
-  const url = await puntoDeEntrada(puerto);
+  // Se guarda lo que diga el navegador para poder explicar un fallo.
+  let dicho = '';
+  const recoger = (trozo) => { dicho += trozo.toString(); };
+  proceso.stdout.on('data', recoger);
+  proceso.stderr.on('data', recoger);
+  proceso.on('error', (error) => { dicho += `\nno se pudo ejecutar: ${error.message}`; });
+  proceso.on('exit', (codigo, senal) => {
+    dicho += `\nel navegador terminó (código ${codigo}, señal ${senal})`;
+  });
+
+  const diagnostico = () => dicho;
+  diagnostico.binario = binario;
+
+  const url = await puntoDeEntrada(puerto, perfil, diagnostico);
   const socket = new WebSocket(url);
   await new Promise((listo, falla) => {
     socket.onopen = listo;

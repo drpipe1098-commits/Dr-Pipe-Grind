@@ -8,6 +8,7 @@
 import { leer, archivosDe, cargar, contrato, RAIZ } from './ayuda.mjs';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const c = contrato('proyecto-contract');
 
@@ -119,5 +120,48 @@ todos
       `${archivo} contiene lo que parece una cédula o un celular real (${numeros[0]}): `
       + 'usa 3001234567 en los ejemplos');
   });
+
+// --- 7. Ningún archivo de código quedó fuera del repositorio ---
+//
+// Las reglas de privacidad de `.gitignore` tapan hojas de vida y perfiles
+// exportados. Sin anclar, «hv-*» y «hoja-de-vida*» también tapaban el código
+// fuente que se llama igual, y el repositorio se subía incompleto sin que
+// nada lo advirtiera. Esto lo vuelve imposible de repetir en silencio.
+const fuentes = ['herramientas', 'tests', 'extension']
+  .flatMap((directorio) => archivosDe(directorio, ['.js', '.mjs']));
+
+// `--no-index` es imprescindible: sin él, git responde que un archivo ya
+// versionado no está ignorado aunque una regla lo tape, y la regresión que
+// esta prueba persigue pasaría desapercibida hasta el siguiente clon limpio.
+const ignorados = spawnSync('git', ['check-ignore', '--no-index', '--stdin'],
+  { cwd: RAIZ, encoding: 'utf8', input: fuentes.join('\n') });
+
+if (ignorados.error) {
+  console.log('  (sin git disponible: no se pudo revisar qué queda ignorado)');
+} else {
+  ignorados.stdout.split('\n').filter(Boolean).forEach((archivo) => {
+    c.exigir(false, `${archivo} es código fuente pero .gitignore lo deja fuera del repositorio`);
+  });
+}
+
+// --- 8. Los workflows tienen que poder parsearse ---
+//
+// POSTULA CI estuvo sin arrancar desde que se escribió: un paso con
+// `run: echo "- Resultado: ..."` mete un «: » dentro de un escalar YAML sin
+// comillas, YAML lo lee como un mapa anidado y el archivo entero deja de
+// parsearse. GitHub no reporta eso como una prueba en rojo, sino como un
+// fallo de arranque con cero jobs, y el PR se queda sin compuertas sin que
+// nada lo advierta. El valor multilínea (`run: |`) no tiene el problema.
+archivosDe('.github/workflows', ['.yml', '.yaml']).forEach((archivo) => {
+  leer(archivo).split('\n').forEach((linea, indice) => {
+    const partido = linea.match(/^\s*(run|name|if|run-name):\s+(\S.*)$/);
+    if (!partido) return;
+    const valor = partido[2].trim();
+    if (/^[|>'"]/.test(valor)) return; // bloque o escalar entrecomillado: a salvo
+    c.exigir(!valor.includes(': '),
+      `${archivo}:${indice + 1} — «${partido[1]}» de una sola línea contiene «: », `
+      + 'que rompe el parseo del workflow. Usa un bloque «|» o entrecomilla el valor.');
+  });
+});
 
 c.cerrar();

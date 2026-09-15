@@ -95,6 +95,40 @@ const CASOS = [
   [{ etiqueta: 'Correo electrónico', tipo: 'email', deshabilitado: true }, null],
   [{ etiqueta: 'Celular', tipo: 'tel', soloLectura: true }, null],
 
+  // --- campos que describen LA VACANTE, no a la persona ---
+  //
+  // Encontrados al verificar la Entrega 3: el motor los confundía con
+  // campos del perfil y escribía los datos del usuario dentro de la
+  // descripción del puesto. «Habilidades requeridas para el cargo» pide lo
+  // que la empresa busca; «Años de experiencia requeridos» pide el mínimo
+  // del aviso. Rellenarlos pone una afirmación falsa sobre la persona en el
+  // formulario de un empleador.
+  [{ etiqueta: 'Habilidades requeridas para el cargo', tipo: 'textarea' }, null],
+  [{ etiqueta: 'Cargo requerido', tipo: 'text' }, null],
+  [{ etiqueta: 'Requisitos del cargo', tipo: 'textarea' }, null],
+  [{ etiqueta: 'Perfil del cargo', tipo: 'textarea' }, null],
+  [{ etiqueta: 'Años de experiencia requeridos', tipo: 'number' }, null],
+  [{ etiqueta: 'Nivel educativo requerido', tipo: 'text' }, null],
+  [{ etiqueta: 'Experiencia requerida', tipo: 'text' }, null],
+  [{ etiqueta: 'Certificaciones requeridas', tipo: 'textarea' }, null],
+  [{ etiqueta: 'Idiomas requeridos', tipo: 'text' }, null],
+  [{ etiqueta: 'Descripción de la vacante', tipo: 'textarea' }, null],
+  [{ etiqueta: 'Ciudad de la vacante', tipo: 'text' }, null],
+  [{ etiqueta: 'Salario ofrecido', tipo: 'text' }, null],
+  [{ etiqueta: 'Lo que buscamos', tipo: 'textarea' }, null],
+  [{ etiqueta: 'Lo que ofrecemos', tipo: 'textarea' }, null],
+  [{ nombre: 'requisitos_cargo', tipo: 'textarea' }, null],
+
+  // Pero el campo del cargo AL QUE ASPIRA la persona sí es suyo: la palabra
+  // «cargo» no puede bastar para descartar.
+  [{ etiqueta: 'Cargo al que aspiras', tipo: 'text' }, 'titularProfesional'],
+  [{ etiqueta: 'Nombre del cargo al que aspira', tipo: 'text' }, 'titularProfesional'],
+
+  // Un encabezado de sección «Requisitos» cerca del campo no puede dejar
+  // sin rellenar a los campos legítimos que estén debajo.
+  [{ etiqueta: 'Celular', textoCercano: 'Requisitos del cargo', tipo: 'tel' }, 'celular'],
+  [{ etiqueta: 'Correo electrónico', textoCercano: 'Lo que buscamos', tipo: 'email' }, 'email'],
+
   // --- datos que son de OTROS, no del usuario ---
   [{ etiqueta: 'Nombre de la empresa', tipo: 'text' }, null],
   [{ etiqueta: 'Razón social', tipo: 'text' }, null],
