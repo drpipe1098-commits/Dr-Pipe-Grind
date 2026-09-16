@@ -16,12 +16,13 @@
  * (AGENTS.md §2 y §4). Un robot que postula solo consigue que bloqueen la
  * cuenta y manda postulaciones que ningún reclutador lee.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { leerVacantes } from './lib/vacantes.mjs';
 import { CRITERIOS_POR_DEFECTO, evaluar, moneda } from './lib/criterios.mjs';
 import { calcular } from './lib/puntaje.mjs';
 import { Perfil } from './lib/esquema.mjs';
+import * as Tablero from './lib/tablero.mjs';
 
 const AYUDA = `
 POSTULA — revisión de vacantes
@@ -34,6 +35,8 @@ Opciones
   --minimo <pesos>        Salario mínimo aceptable (por defecto: 2500000)
   --descartadas           Muestra también las que no pasaron el filtro y por qué
   --reporte               Solo imprime el informe, sin preguntar nada
+  --tablero <archivo>     Dónde registrar lo que marques (por defecto: mis-postulaciones.json)
+  --sin-tablero           No registrar nada
   --ayuda                 Esta ayuda
 
 El archivo de vacantes se arma a mano con lo que llega a tu correo desde las
@@ -50,12 +53,15 @@ alertas de los portales. Formato de texto, separando cada aviso con ---:
 
 function opciones(argv) {
   const o = { archivo: '', perfil: 'mi-perfil-postula.json', criterios: '',
-    minimo: null, descartadas: false, reporte: false, ayuda: false };
+    minimo: null, descartadas: false, reporte: false, ayuda: false,
+    tablero: 'mis-postulaciones.json', sinTablero: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--ayuda' || arg === '-h' || arg === '--help') o.ayuda = true;
     else if (arg === '--descartadas') o.descartadas = true;
     else if (arg === '--reporte') o.reporte = true;
+    else if (arg === '--sin-tablero') o.sinTablero = true;
+    else if (arg === '--tablero') { o.tablero = argv[i + 1] || o.tablero; i += 1; }
     else if (arg === '--perfil') { o.perfil = argv[i + 1] || o.perfil; i += 1; }
     else if (arg === '--criterios') { o.criterios = argv[i + 1] || ''; i += 1; }
     else if (arg === '--minimo') { o.minimo = Number(argv[i + 1]); i += 1; }
@@ -122,7 +128,41 @@ async function revisar(aprobadas) {
   return escogidas;
 }
 
-function despedida(escogidas) {
+/**
+ * Deja las vacantes marcadas en el tablero, como «por postular».
+ *
+ * Se registran aquí y no al final del proceso porque el momento en que la
+ * persona dice «esta sí» es el único en que tiene el contexto fresco; si hay
+ * que acordarse de anotarlas después, no se anotan.
+ */
+function registrarEnTablero(escogidas, ruta) {
+  let tablero = Tablero.tableroVacio();
+  if (existsSync(ruta)) {
+    try {
+      tablero = Tablero.sanear(JSON.parse(readFileSync(ruta, 'utf8')));
+    } catch (error) {
+      console.error(`\n  ${c.amarillo('Aviso')}: el tablero ${ruta} no se pudo leer `
+        + `(${error.message}); no se registró nada para no dañarlo.\n`);
+      return { nuevas: 0, repetidas: 0 };
+    }
+  }
+
+  const hoy = Tablero.aFecha(new Date());
+  let nuevas = 0;
+  let repetidas = 0;
+  escogidas.forEach(({ vacante, puntuacion }) => {
+    const resultado = Tablero.agregar(
+      tablero, { ...vacante, puntaje: puntuacion.puntaje }, hoy
+    );
+    tablero = resultado.tablero;
+    if (resultado.yaEstaba) repetidas += 1; else nuevas += 1;
+  });
+
+  writeFileSync(ruta, `${JSON.stringify(tablero, null, 2)}\n`, 'utf8');
+  return { nuevas, repetidas };
+}
+
+function despedida(escogidas, opcionesTablero) {
   if (!escogidas.length) {
     console.log('\n  No escogiste ninguna vacante esta vez.\n');
     return;
@@ -132,10 +172,24 @@ function despedida(escogidas) {
     console.log(`   ${i + 1}. ${item.vacante.titulo} — ${item.vacante.empresa}`);
     if (item.vacante.enlace) console.log(`      ${item.vacante.enlace}`);
   });
+  if (opcionesTablero && !opcionesTablero.sinTablero) {
+    const { nuevas, repetidas } = registrarEnTablero(escogidas, opcionesTablero.tablero);
+    const partes = [];
+    if (nuevas) partes.push(`${nuevas} nueva(s)`);
+    if (repetidas) partes.push(`${repetidas} ya estaba(n)`);
+    if (partes.length) {
+      console.log(`\n  Anotadas en ${opcionesTablero.tablero}: ${partes.join(', ')}.`);
+      console.log(c.tenue('  Míralas con: node herramientas/tablero.mjs'));
+    }
+  }
+
   console.log(`
   Para cada una: abre el enlace, entra al formulario de postulación y dale
   al botón de POSTULA para llenar tus datos. Revisa lo que quedó escrito y
   ${c.fuerte('envía tú')} la postulación.
+
+  Cuando la hayas enviado, márcala:
+  ${c.tenue('  node herramientas/tablero.mjs estado <id> postulado')}
 
   ${c.tenue('POSTULA no envía formularios: quien manda la postulación eres tú.')}
 `);
@@ -206,7 +260,7 @@ async function main() {
     return;
   }
 
-  despedida(await revisar(aprobadas));
+  despedida(await revisar(aprobadas), { tablero: o.tablero, sinTablero: o.sinTablero });
 }
 
 main().catch((error) => {

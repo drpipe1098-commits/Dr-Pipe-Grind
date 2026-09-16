@@ -17,6 +17,11 @@ mis-vacantes*
 vacantes.txt
 vacantes.json
 
+# El tablero dice a qué empleos se postuló alguien y en qué va cada proceso.
+# Es de lo más sensible que produce este proyecto.
+mis-postulaciones*
+postulaciones*.json
+
 node_modules/
 .DS_Store
 *.zip

@@ -164,4 +164,27 @@ archivosDe('.github/workflows', ['.yml', '.yaml']).forEach((archivo) => {
   });
 });
 
+// --- 9. Los archivos que produce el usuario están fuera del repositorio ---
+//
+// El reverso del candado anterior: el código tiene que entrar y los datos
+// personales tienen que quedarse fuera. El tablero dice a qué empleos se
+// postuló alguien; el perfil, su cédula y su teléfono.
+const PERSONALES = [
+  'mi-perfil-postula.json', 'perfil-exportado.json', 'mis-vacantes.txt',
+  'mis-postulaciones.json', 'postulaciones-2026.json', 'hoja-de-vida.pdf',
+  'hv-andrea.pdf', 'cualquiera.pdf', 'cualquiera.docx'
+];
+const revisados = spawnSync('git', ['check-ignore', '--no-index', '--stdin'],
+  { cwd: RAIZ, encoding: 'utf8', input: PERSONALES.join('\n') });
+
+if (revisados.error) {
+  console.log('  (sin git disponible: no se pudo revisar el ignorado de datos personales)');
+} else {
+  const ignorados = new Set(revisados.stdout.split('\n').filter(Boolean));
+  PERSONALES.forEach((archivo) => {
+    c.exigir(ignorados.has(archivo),
+      `${archivo} contendría datos personales y .gitignore no lo está tapando`);
+  });
+}
+
 c.cerrar();
