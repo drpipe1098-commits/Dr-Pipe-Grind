@@ -1,8 +1,8 @@
 # Herramientas de terminal
 
-Dos programas que se ejecutan con `node`, sin instalar nada. No son parte de
-la extensión: preparan lo que la extensión usa y ayudan a decidir a qué
-vacante vale la pena postularse.
+Tres programas que se ejecutan con `node`, sin instalar nada. No son parte de
+la extensión: preparan lo que la extensión usa, ayudan a decidir a qué vacante
+vale la pena postularse, y llevan el registro de lo que ya se envió.
 
 Ninguna de las dos entra a un portal de empleo, inicia sesión ni envía una
 postulación. `tests/envio-contract.mjs` lo impide: prohíbe en `herramientas/`
@@ -111,6 +111,75 @@ Cuando la persona marca una vacante con `s`, la herramienta **anota el
 enlace**. No abre el navegador, no llena nada y no envía nada. Al terminar
 entrega la lista para que la persona abra cada aviso, use el botón de POSTULA
 para rellenar el formulario, revise lo que quedó escrito y envíe ella misma.
+
+---
+
+## `tablero.mjs` — a qué te postulaste y qué toca hoy
+
+```bash
+node herramientas/tablero.mjs                        # qué toca hoy
+node herramientas/tablero.mjs listar
+node herramientas/tablero.mjs estado <id> postulado
+```
+
+Buscar empleo en serio significa tener veinte procesos abiertos a la vez, cada
+uno en un estado distinto. A las tres semanas nadie recuerda a cuál portal
+aplicó, cuándo, ni a quién le prometió enviar algo. Eso no se arregla con
+memoria.
+
+El tablero vive en `mis-postulaciones.json`, en el equipo de la persona.
+`.gitignore` y un candado lo mantienen fuera del repositorio: es de lo más
+sensible que produce este proyecto.
+
+### Cómo se llena
+
+Solo. Cuando marcas una vacante con `s` en `vacantes.mjs`, entra al tablero
+como **Por postular**. Ese es el único momento en que tienes el contexto
+fresco; si hay que acordarse de anotarla después, no se anota.
+
+También se puede a mano con `tablero.mjs agregar --titulo … --empresa …`, y
+apagar el registro automático con `vacantes.mjs --sin-tablero`.
+
+### Estados
+
+| Estado | Seguimiento sugerido |
+|---|---|
+| `porPostular` | 2 días |
+| `postulado` | 7 días desde el envío |
+| `enProceso` | 5 días |
+| `entrevista` | 3 días |
+| `prueba` | 3 días |
+| `oferta` | 2 días |
+| `descartado` | — |
+| `sinRespuesta` | — |
+
+`sinRespuesta` no es un fracaso ni un final: es reconocer que la mayoría de las
+postulaciones no reciben respuesta nunca, y que seguir esperándolas consume
+atención que sirve para otra cosa. El tablero señala las que llevan más de tres
+semanas enviadas y propone cerrarlas.
+
+### Órdenes
+
+| Orden | Qué hace |
+|---|---|
+| (ninguna) | Seguimientos vencidos, estancadas y conteo por estado |
+| `listar` | Las abiertas; con `--todas`, también las cerradas |
+| `agregar` | Registra una a mano |
+| `estado <id> <estado>` | Mueve de estado; `--nota "texto"` la acompaña |
+| `nota <id> "texto"` | Anota en el historial |
+| `seguimiento <id> <cuando>` | `+7d`, `+2s`, `mañana`, `2026-10-01` |
+
+### Las tres reglas
+
+- **No se inventan fechas.** Una postulación sin fecha de envío no tiene una
+  supuesta. Un registro que rellena huecos por su cuenta deja de servir para
+  decidir.
+- **Nada se pierde.** Cada cambio deja su línea en el historial; el estado
+  actual es un resumen, no el dato.
+- **La misma vacante no entra dos veces.** Las listas se solapan entre
+  corridas y los portales escriben la misma empresa de cinco maneras
+  —«Ejemplo SAS», «Ejemplo S.A.S», «Ejemplo S.A.S.»—, así que la forma
+  jurídica no cuenta para identificarla.
 
 ---
 

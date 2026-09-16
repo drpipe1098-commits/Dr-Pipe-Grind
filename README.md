@@ -4,69 +4,44 @@ Este README es una **foto operativa de la entrega actual únicamente**. El conte
 
 ## Qué se hizo
 
-**Entrega 3 — De la hoja de vida al perfil, y de la vacante al puntaje.**
+**Entrega 4 — Tablero de postulaciones.**
 
-POSTULA rellenaba formularios, pero el perfil se escribía a mano campo por campo y se decidía a qué postularse leyendo avisos uno por uno. Esta entrega cierra los dos extremos con dos herramientas de terminal que corren con `node`, sin instalar nada.
+La Entrega 3 dejó resuelto el principio (la hoja de vida se vuelve perfil) y el filtro (qué vacante vale la pena). Faltaba el medio: buscar empleo en serio significa tener veinte procesos abiertos a la vez, y a las tres semanas nadie recuerda a cuál portal aplicó, cuándo, ni a quién le prometió enviar algo.
 
-- **Extractor de texto de PDF sin dependencias.** Node ya trae `zlib`, que es lo único necesario. Entiende las fuentes simples de un byte (Word, LibreOffice, navegador) y las compuestas subsetadas con `/ToUnicode` (WeasyPrint, Canva, Chrome), donde los bytes son identificadores de glifo y sin el mapa de la fuente el texto es ilegible. Si el PDF no tiene capa de texto, lo dice y se detiene.
-- **Hoja de vida → Perfil Único.** Reconoce identidad, contacto, ubicación, titular, resumen, experiencia laboral completa, educación, idiomas, habilidades y certificaciones, y **calcula** los años de experiencia sin contar dos veces los periodos solapados. Escribe el JSON que se importa desde la página de Perfil.
-- **Filtros y puntaje de vacantes.** Descarta por salario, modalidad, inglés hablado y trabajo en terreno; puntúa de 0 a 100 contra la hoja de vida, en el equipo y sin red, mostrando las palabras que produjeron cada puntaje. Revisión interactiva en la terminal, ordenada por compatibilidad.
-- **Dos campos nuevos en el perfil**, `habilidades` y `certificaciones`, con sus patrones en el matcher: las secciones de la hoja de vida que antes no tenían dónde caer.
+```bash
+node herramientas/tablero.mjs                        # qué toca hoy
+node herramientas/tablero.mjs estado <id> postulado
+```
 
-**Lo que esta entrega NO hace, a propósito:** no entra a los portales, no inicia sesión, no rastrea vacantes y no envía postulaciones. Cuando la persona marca una vacante recibe el enlace; ella abre, rellena con el botón de POSTULA, revisa y envía. `tests/envio-contract.mjs` ahora prohíbe en `herramientas/` las llamadas de red, los controladores de navegador, la lectura de contraseñas y la navegación a un portal.
+- **Ocho estados**, de «por postular» a «sin respuesta», cada uno con su plazo de seguimiento. `sinRespuesta` no es un fracaso: es reconocer que la mayoría de las postulaciones no reciben respuesta nunca, y que seguir esperándolas consume atención.
+- **La pregunta que responde es «qué toca hoy»**: seguimientos vencidos, los más atrasados primero, y las postuladas hace más de tres semanas señaladas como candidatas a cerrar.
+- **Se llena solo.** Marcar una vacante con `s` en `vacantes.mjs` la registra, porque ese es el único momento en que la persona tiene el contexto fresco.
+- **Un archivo JSON en su equipo**, `mis-postulaciones.json`. Sin servidor, sin cuenta y sin red: el tablero sabe a qué te postulaste, y eso no tiene por qué saberlo nadie más.
 
-**Siete fallos reales que encontró esta entrega.** Cinco en el producto, blindados con pruebas:
-
-1. El tramo WinAnsi `0x80–0x9F` se leía como latin1: las comillas tipográficas y las rayas de cualquier hoja de vida salían como caracteres de control.
-2. Las funciones de un cargo arrastraban la cabecera del cargo siguiente.
-3. Un título «en curso» le ganaba al terminado, y el perfil declaraba un estudio sin terminar como si fuera un título obtenido.
-4. El nivel educativo solo se reconocía en masculino: «Tecnóloga» o «Ingeniera» se quedaban sin título.
-5. **El motor confundía los requisitos del cargo con los datos de la persona.** «Habilidades requeridas para el cargo» caía en `titularProfesional`, «Años de experiencia requeridos» en `anosExperiencia`. POSTULA habría escrito los datos del usuario dentro de la descripción del puesto: una afirmación falsa sobre él ante un empleador.
-
-Y dos en el repositorio, no en el producto:
-
-6. Los patrones `hv-*` y `hoja-de-vida*` de `.gitignore` dejaban fuera del repositorio tres archivos fuente de esta entrega. Anclados, con candado propio.
-7. **POSTULA CI nunca había arrancado.** Un `: ` sin comillas en un escalar YAML rompe el parseo: GitHub responde con fallo de arranque y cero jobs, que no se parece a una prueba en rojo. Además los disparadores apuntaban a una rama `main` que no existe. Corregido, con candado.
+**Tres reglas que el candado sostiene:** no se inventan fechas (una postulación sin fecha de envío no tiene una supuesta); nada se pierde (cada cambio deja su línea en el historial); y la misma vacante no entra dos veces, aunque los portales escriban la empresa como «Ejemplo SAS», «Ejemplo S.A.S» o «Ejemplo S.A.S.».
 
 ## Archivos modificados en esta entrega
 
-- `.github/workflows/ci.yml` — sintaxis de los `.mjs`, arranque de las dos herramientas, y disparadores que sí coinciden con las ramas del remoto.
-- `.github/workflows/readme-deploy-snapshot.yml` — mismo arreglo de disparadores.
-- `.gitignore` — las vacantes de la persona no entran al repositorio, y los patrones de hoja de vida quedan anclados a la raíz.
-- `AGENTS.md` — estado de la Entrega 3, candados, prioridades y mapa del repositorio.
+- `.gitignore` — `mis-postulaciones.json` y sus variantes fuera del repositorio.
+- `AGENTS.md` — estado de la Entrega 4, candado nuevo, prioridades y mapa.
 - `README.md` — esta foto de entrega.
-- `docs/HERRAMIENTAS.md` — las dos herramientas, sus opciones y sus límites.
-- `extension/lib/perfil.js` — grupo «Conocimientos» con `habilidades` y `certificaciones`.
-- `extension/content/matcher.js` — patrones para los dos campos nuevos, y exclusión de los rótulos que describen la vacante en vez de a la persona.
-- `tests/matcher-contract.mjs` — 19 casos nuevos sobre esa exclusión, en ambas direcciones.
-- `herramientas/hv-a-perfil.mjs` — CLI: PDF → perfil importable, con informe de lo que quedó vacío.
-- `herramientas/vacantes.mjs` — CLI: filtra, puntúa, ordena y pregunta; entrega enlaces, no postulaciones.
-- `herramientas/ejemplo-vacantes.txt` — formato del archivo de vacantes, con datos ficticios.
-- `herramientas/lib/pdf-texto.mjs` — extractor de texto de PDF sin dependencias.
-- `herramientas/lib/hoja-de-vida.mjs` — texto de hoja de vida → perfil, sin inventar campos.
-- `herramientas/lib/esquema.mjs` — puente al esquema de la extensión: una sola definición del perfil.
-- `herramientas/lib/criterios.mjs` — salario colombiano, modalidad, inglés hablado, trabajo en terreno.
-- `herramientas/lib/puntaje.mjs` — compatibilidad de 0 a 100, explicable y sin red.
-- `herramientas/lib/vacantes.mjs` — lectura de la lista en texto o JSON.
-- `tests/envio-contract.mjs` — el candado de no envío ahora cubre las herramientas de terminal.
-- `tests/pdf-contract.mjs` — candado del extractor sobre las cuatro formas reales de escribir un PDF.
-- `tests/hoja-de-vida-contract.mjs` — candado de «nunca inventar», con los cuatro fallos de arriba como casos.
-- `tests/vacantes-contract.mjs` — candado de filtros y puntaje.
-- `tests/proyecto-contract.mjs` — dos candados: ningún archivo de código tapado por `.gitignore`, y los workflows deben parsearse.
-- `tests/pdf/constructor.mjs` — constructor de PDF de prueba en memoria; el repositorio no admite archivos PDF.
-- `tests/navegador/cdp.mjs` — navegador con perfil propio y puerto del sistema; un fallo ahora explica por qué.
+- `docs/HERRAMIENTAS.md` — el tablero: órdenes, estados y sus tres reglas.
+- `herramientas/tablero.mjs` — CLI del tablero: qué toca hoy, listar, estado, nota, seguimiento.
+- `herramientas/lib/tablero.mjs` — estados, fechas, identidad sin forma jurídica y consultas.
+- `herramientas/vacantes.mjs` — lo que marcas con «s» entra al tablero; `--tablero` y `--sin-tablero`.
+- `tests/tablero-contract.mjs` — candado del tablero.
+- `tests/proyecto-contract.mjs` — candado nuevo: los archivos de datos personales tienen que estar ignorados.
 
 ## Validación
 
-- **VALIDADO EN CÓDIGO** localmente: los **10 candados** pasan (`npm test`), con los 3 nuevos sumando la extracción de PDF en sus cuatro formas, el reconocimiento de hoja de vida y los filtros de vacantes.
-- El extractor y el reconocedor se probaron además contra **una hoja de vida real en PDF** generada por WeasyPrint, fuera del repositorio: 2 páginas, 16 campos reconocidos, 4 cargos con sus fechas y funciones correctas, y 14 campos correctamente vacíos por no estar en el documento. Los cuatro fallos listados arriba salieron de esa corrida.
-- Los filtros se probaron contra un archivo de vacantes ficticias: de 5 avisos, descartó el que exige inglés B2 conversacional y el presencial de bajo salario con trabajo en terreno, y dejó pasar el que solo pide inglés técnico de lectura.
-- **POSTULA CI corrió por primera vez** y quedó verde: `contratos`, `navegador`, `validate` y `README Deploy Snapshot`. Antes ni arrancaba.
-- La compuerta `navegador` resultó **intermitente**: la misma commit dio rojo por `push` y verde por `pull_request`. Ahora usa perfil propio y puerto del sistema.
-- **NO está validado en uso real.** El perfil generado todavía no se ha importado en un navegador ni se ha usado para postularse en un portal real.
+- **VALIDADO EN CÓDIGO** localmente: los **11 candados** pasan (`npm test`), uno de ellos nuevo.
+- El candado nuevo de `.gitignore` se verificó **rompiéndolo a propósito**: al quitar `mis-postulaciones` del archivo, falla; al restaurarlo, pasa.
+- El tablero se ejecutó a mano contra un archivo con fechas reales: mostró un seguimiento con 28 días de atraso, una entrevista con 2, y propuso cerrar una postulación de hace 35 días.
+- Pendiente de las compuertas del PR: **POSTULA CI / validate** y **README Deploy Snapshot**.
+- **NO está validado en uso real.** Nadie ha llevado una búsqueda de empleo con este tablero. Los estados, los plazos de seguimiento y el umbral de tres semanas son supuestos razonables, no observaciones.
 
 ## Qué sigue
 
-1. **Importar el perfil generado** en POSTULA y postularse de verdad siguiendo `docs/INSTALACION.md`. Cada campo que falle en un portal real se convierte en un caso de `tests/matcher-contract.mjs`.
-2. **Tablero de postulaciones** — registro local de a qué se postuló, fecha, estado y próximo seguimiento. Sin servidor. La lista que hoy imprime `vacantes.mjs` al final es su punto de partida natural.
-3. **Radar de vacantes** — leer las alertas de empleo que los portales mandan al correo para armar solo el archivo que hoy se escribe a mano.
+1. **Usar el tablero durante una búsqueda de verdad.** Cada plazo que resulte mal calibrado y cada estado que falte se corrigen con lo observado, no con lo imaginado.
+2. **Importar el perfil en POSTULA y postularse.** Sigue siendo el paso que convierte todo esto en `VALIDADO EN USO REAL`, y cada campo que falle en un portal real se vuelve un caso de `tests/matcher-contract.mjs`.
+3. **Radar de vacantes** — leer las alertas de empleo del correo para armar solo el archivo que hoy se escribe a mano.

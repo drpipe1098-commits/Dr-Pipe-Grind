@@ -137,9 +137,38 @@ reconocimiento de nivel educativo solo entendía la forma masculina, así que
 «Tecnóloga» o «Ingeniera» se quedaban sin título. Los cuatro quedaron
 blindados en `tests/hoja-de-vida-contract.mjs` y `tests/pdf-contract.mjs`.
 
+### Entrega 4 — Tablero de postulaciones
+
+Tercera herramienta de terminal (`herramientas/tablero.mjs`), con su lógica en
+`herramientas/lib/tablero.mjs`. Un archivo JSON en el equipo de la persona,
+sin servidor y sin red.
+
+- ocho estados con seguimiento sugerido propio, de «por postular» a «sin
+  respuesta»; el historial guarda cada cambio con su fecha y el estado actual
+  es solo un resumen;
+- la pregunta que responde es «qué toca hoy»: seguimientos vencidos primero
+  los más atrasados, y las postuladas hace más de tres semanas señaladas como
+  candidatas a cerrar;
+- identidad por empresa y cargo con la forma jurídica descartada, porque los
+  portales escriben la misma empresa como «Ejemplo SAS», «Ejemplo S.A.S» o
+  «Ejemplo S.A.S.» y sin eso el tablero se llena de duplicados;
+- fechas relativas escritas como las escribe una persona (`+7d`, `+2s`,
+  `mañana`); lo que no se entiende se rechaza en vez de adivinarse;
+- `vacantes.mjs` registra en el tablero lo que la persona marca con «s», que
+  es el único momento en que tiene el contexto fresco;
+- `mis-postulaciones.json` queda fuera del repositorio por `.gitignore` y por
+  un candado que lo verifica.
+
+También se corrigió un defecto del matcher encontrado al verificar la Entrega
+3: rótulos como «Habilidades requeridas para el cargo» o «Años de experiencia
+requeridos» describen la vacante, no a la persona, y caían en campos del
+perfil. POSTULA habría escrito los datos del usuario dentro de la descripción
+del puesto. Ahora hay una lista de exclusión comparada solo contra las señales
+propias del campo.
+
 ### Pendiente (ver sección 9)
 
-Tablero, lectura automática de las alertas de empleo del correo, Recetas por portal y Redactor.
+Lectura automática de las alertas de empleo del correo, Recetas por portal y Redactor.
 
 ---
 
@@ -187,7 +216,8 @@ Candados vigentes:
 - `tests/pdf-contract.mjs` — el texto se extrae de las cuatro formas reales de escribir un PDF, los acentos sobreviven, y lo ilegible se reporta en vez de devolverse vacío.
 - `tests/hoja-de-vida-contract.mjs` — la hoja de vida se convierte en perfil **sin inventar**: lo que el documento no dice queda vacío y se reporta como pendiente.
 - `tests/vacantes-contract.mjs` — los filtros descartan lo que deben, ante la duda la vacante pasa con advertencia, y el puntaje es auditable.
-- `tests/proyecto-contract.mjs` — `AGENTS.md`, `README.md` y el manifiesto conservan su estructura obligatoria; ningún archivo del repositorio contiene datos personales reales.
+- `tests/tablero-contract.mjs` — el tablero no inventa fechas, no pierde historial, no duplica la misma vacante y acierta en «qué toca hoy».
+- `tests/proyecto-contract.mjs` — `AGENTS.md`, `README.md` y el manifiesto conservan su estructura obligatoria; ningún archivo del repositorio contiene datos personales reales; ningún archivo de código queda tapado por `.gitignore` y ningún archivo de datos personales queda sin tapar; los workflows se pueden parsear.
 
 ### Compuertas de POSTULA CI
 
@@ -276,7 +306,7 @@ Salvo que el usuario repriorice explícitamente:
 Cuando no haya PR abierto ni pedido explícito del usuario, continuar en este orden después de verificar que el código no lo haya hecho ya:
 
 1. **Endurecer el reconocimiento de campos** con casos reales encontrados al postularse. Cada campo que falle en un portal real se convierte en un caso de `tests/matcher-contract.mjs` y, si depende del DOM, en un formulario nuevo bajo `tests/navegador/`.
-2. **Tablero de postulaciones** — registro local de a qué se postuló, fecha, estado, respuesta y próximo seguimiento. Sin servidor.
+2. **Endurecer el tablero con uso real.** Existe (`herramientas/tablero.mjs`) pero nadie lo ha usado durante una búsqueda de verdad. Los estados, los plazos de seguimiento y el umbral de tres semanas son supuestos, no observaciones.
 3. **Radar de vacantes** — la mitad del filtrado ya existe en `herramientas/vacantes.mjs`, pero la lista se arma a mano. Falta leer las alertas de empleo que los portales envían al correo del usuario para armarla sola. Sin scraping: el usuario activa las alertas y POSTULA solo lee su propio buzón, con su autorización.
 4. **Recetas por portal** — ajustes específicos para formularios difíciles, cuando el motor genérico no alcance.
 5. **Redactor** — texto de presentación adaptado a cada vacante, y respuestas preparadas a preguntas frecuentes del reclutador.
@@ -309,7 +339,7 @@ extension/          la extensión completa, cargable tal cual en el navegador
   content/          código que se inyecta en la página del portal
   iconos/           iconos de la extensión
 herramientas/       programas de terminal (node, sin dependencias)
-  lib/              lectura de PDF, hoja de vida, criterios y puntaje
+  lib/              lectura de PDF, hoja de vida, criterios, puntaje y tablero
 tests/              pruebas de contrato en Node, sin dependencias
   navegador/        cliente CDP y formularios que imitan portales reales
   pdf/              constructor de PDF de prueba, en memoria
