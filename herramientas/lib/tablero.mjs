@@ -100,34 +100,16 @@ export function interpretarFecha(texto, hoy) {
 // --- Identidad de una postulación ------------------------------------------
 
 /**
- * Formas jurídicas, que no identifican a nadie y se escriben de cualquier
- * manera: «Ejemplo SAS», «Ejemplo S.A.S», «Ejemplo S.A.S.», «Ejemplo Ltda.».
- * Sin quitarlas, la misma empresa entra al tablero varias veces según cómo
- * la haya escrito cada portal.
- */
-const FORMAS_JURIDICAS = new Set([
-  'sas', 'sa', 'ltda', 'limitada', 'eu', 'sca', 'cia', 'compania',
-  'inc', 'llc', 'ltd', 'corp', 'srl', 'spa', 'bic', 'group', 'grupo',
-  's', 'a', 'c', 'u', 'e', 'en', 'y'
-]);
-
-/** Nombre de empresa reducido a lo que de verdad la identifica. */
-function nucleoDeEmpresa(nombre) {
-  const palabras = normalizar(nombre).split(' ').filter(Boolean);
-  while (palabras.length > 1 && FORMAS_JURIDICAS.has(palabras[palabras.length - 1])) {
-    palabras.pop();
-  }
-  return palabras.join('-');
-}
-
-/**
  * Identificador estable de una vacante: empresa y cargo, normalizados.
  *
  * Dos avisos de la misma empresa para el mismo cargo son la misma
  * postulación aunque los portales escriban distinto el nombre legal.
  */
 export function idDe(vacante) {
-  const empresa = nucleoDeEmpresa(vacante.empresa || '');
+  // La normalización de nombres de empresa vive en la librería compartida
+  // de la extensión: es la misma regla para el tablero y para el
+  // autorrelleno, y duplicarla sería dejar que se desincronicen.
+  const empresa = Normalizar.nucleoDeEmpresa(vacante.empresa || '').replace(/ /g, '-');
   const titulo = normalizar(vacante.titulo || '').replace(/ /g, '-');
   const base = [empresa, titulo].filter(Boolean).join('--');
   return base.slice(0, 80) || 'sin-nombre';

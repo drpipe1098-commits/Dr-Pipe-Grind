@@ -10,6 +10,7 @@
  *  - `portal-clasico.html`     · <label for> explícito y selects
  *  - `portal-sin-labels.html`  · el rótulo vive en un div hermano
  *  - `portal-moderno.html`     · autocomplete estándar, iframe y trampas
+ *  - `portal-experiencia.html` · historial laboral repetido, como elempleo.com
  *
  * Si no hay navegador disponible, la prueba se salta sin fallar: el resto
  * de los candados sigue corriendo con Node puro.
@@ -25,6 +26,7 @@ const ARCHIVOS = [
   'extension/lib/normalizar.js',
   'extension/lib/perfil.js',
   'extension/content/matcher.js',
+  'extension/content/experiencia.js',
   'extension/content/autofill.js'
 ];
 const FUENTES = ARCHIVOS.map((a) => readFileSync(join(RAIZ, a), 'utf8'));
@@ -45,7 +47,18 @@ const PERFIL = {
   disponibilidadViajar: '', licenciaConduccion: '', tieneVehiculo: '',
   nivelEducativo: 'Tecnólogo', titulo: 'Tecnólogo en ADSI',
   institucion: 'SENA', anoGrado: '2021',
-  experiencia: [], idiomas: []
+  experiencia: [
+    { cargo: 'Analista de Soporte Nivel 2', empresa: 'Servicios Ejemplo Dos SAS',
+      desde: 'Marzo 2022', hasta: 'Presente',
+      funciones: 'Atención de incidentes y escalamiento a proveedores.' },
+    { cargo: 'Gestor de Proyectos Multimedia', empresa: 'Agencia Ejemplo Uno SAS',
+      desde: 'Octubre 2020', hasta: 'Marzo 2021',
+      funciones: 'Administración de contenidos y optimización SEO.' },
+    { cargo: 'Auxiliar de Mesa de Ayuda', empresa: 'Ejemplo Tres Ltda',
+      desde: 'Enero 2019', hasta: 'Febrero 2020',
+      funciones: 'Registro de tickets y soporte a usuarios finales.' }
+  ],
+  idiomas: []
 };
 
 const LEER_CAMPOS = `JSON.stringify(
@@ -181,6 +194,55 @@ if (!navegador) {
     c.igual(r.campos.tarjeta, '', 'moderno · la tarjeta de crédito NUNCA se toca');
     c.igual(r.campos.cvv, '', 'moderno · el CVV NUNCA se toca');
     c.igual(r.campos.invisible, '', 'moderno · un campo invisible no se toca');
+    // ---------- 4. Historial laboral repetido (elempleo.com) ----------
+    //
+    // El fallo real: «Nombre del cargo» dentro de la fila de un empleo se
+    // llenaba con el titular profesional. POSTULA declaraba ante un
+    // empleador un cargo que la persona nunca tuvo en esa empresa.
+    r = await correrFormulario(navegador, contextos, 'portal-experiencia.html');
+
+    // El bloque 1 ya decía de qué empleo habla: «Agencia Ejemplo Uno SAS»,
+    // 2020–2021. Le corresponde la segunda entrada, no la primera.
+    c.igual(r.campos.cargo1, 'Gestor de Proyectos Multimedia',
+      'experiencia · el cargo sale de la entrada que corresponde al bloque');
+    c.exigir(r.campos.cargo1 !== PERFIL.titularProfesional,
+      'experiencia · el titular profesional NUNCA va dentro de una fila de empleo');
+    c.igual(r.campos.logros1, 'Administración de contenidos y optimización SEO.',
+      'experiencia · las funciones son las de ese empleo');
+    c.igual(r.campos.mesInicio1, 'Oct', 'experiencia · el mes va a la lista de meses');
+    c.igual(r.campos.mesFin1, 'Mar', 'experiencia · el mes de fin también');
+    c.igual(r.campos.empresa1, 'Agencia Ejemplo Uno SAS',
+      'experiencia · lo que la persona ya escribió no se pisa');
+    c.igual(r.campos.anoInicio1, '2020', 'experiencia · el año ya escrito tampoco');
+
+    // El bloque 2 estaba vacío: le toca la entrada más reciente que quedaba.
+    c.igual(r.campos.cargo2, 'Analista de Soporte Nivel 2',
+      'experiencia · un bloque vacío recibe la entrada más reciente disponible');
+    c.igual(r.campos.empresa2, 'Servicios Ejemplo Dos SAS',
+      'experiencia · con su empresa');
+    c.igual(r.campos.mesInicio2, 'Marzo', 'experiencia · mes en una casilla de texto');
+    c.igual(r.campos.anoInicio2, '2022', 'experiencia · año en su propia casilla');
+    c.exigir(r.campos.cargo2 !== r.campos.cargo1,
+      'experiencia · dos bloques nunca reciben el mismo empleo');
+
+    // Fuera de los bloques, el titular profesional sí es lo correcto.
+    c.igual(r.campos.cargoAspira, 'Analista de Soporte TI',
+      'experiencia · «Cargo al que aspiras» SÍ es el titular de la persona');
+    c.igual(r.campos.email, 'ana@ejemplo.com',
+      'experiencia · los datos normales del perfil se siguen llenando');
+
+    // Trampas.
+    c.igual(r.campos.cargoEquivalente1, '',
+      'experiencia · «Cargo equivalente» es sugerencia del portal: no se toca');
+    c.igual(r.campos.sector1, '',
+      'experiencia · el sector de la empresa no es un dato de la persona');
+    c.igual(r.campos.ubicacionEmpresa1, '',
+      'experiencia · la ubicación es de la EMPRESA: no se pone la ciudad de la persona');
+    c.igual(r.campos.requisitosCargo, '',
+      'experiencia · los requisitos de la vacante siguen sin tocarse');
+    c.igual(r.campos.palabraClave, '', 'experiencia · el buscador NO se toca');
+    c.igual(r.campos.clave, '', 'experiencia · la contraseña NUNCA se toca');
+
   } catch (error) {
     c.exigir(false, 'la prueba de navegador reventó: ' + (error.message || error));
   } finally {

@@ -166,6 +166,42 @@ perfil. POSTULA habría escrito los datos del usuario dentro de la descripción
 del puesto. Ahora hay una lista de exclusión comparada solo contra las señales
 propias del campo.
 
+### Entrega 5 — El historial laboral se llena por bloques
+
+Primer fallo encontrado **postulándose de verdad**, en elempleo.com: el campo
+«Nombre del cargo» de la fila de un empleo pasado se llenó con el titular
+profesional de la hoja de vida. POSTULA afirmó ante un empleador que el cargo
+en esa empresa había sido otro.
+
+La causa era de arquitectura, no un patrón mal escrito: el motor decidía campo
+por campo y no sabía dónde estaba. Eso basta para el correo o la cédula, que la
+persona tiene una sola vez, y se rompe en el historial laboral, donde el mismo
+rótulo aparece una vez por empleo.
+
+- `extension/content/experiencia.js`: reconoce los campos que pertenecen a una
+  fila de experiencia —que son otra cosa que los campos del perfil aunque se
+  llamen parecido—, empareja cada bloque con su entrada de `experiencia[]` y
+  reparte las fechas entre las casillas del portal;
+- el autorrelleno pasa a dos pasadas: primero los bloques, después el resto.
+  Los campos de un bloque quedan **fuera del alcance de la segunda pasada
+  aunque no se hayan podido llenar**, que es lo que impide que el titular
+  vuelva a caer dentro de una fila;
+- un bloque se delimita por una regla de producto, no de DOM: **un bloque es
+  UN empleo**, así que no puede contener dos cargos ni dos empresas. Las
+  fechas sí pueden repetirse, porque los portales parten una fecha en lista de
+  meses más casilla de año;
+- el emparejado usa lo que el formulario ya tiene escrito: cuando la persona
+  escribió la empresa, esa es la señal más confiable sobre de qué empleo
+  habla. Sin señales, se asigna por orden, del más reciente al más antiguo;
+- `nucleoDeEmpresa` y `mismaEmpresa` suben a `extension/lib/normalizar.js`:
+  son la misma regla para el tablero y para el autorrelleno, y duplicarlas era
+  dejar que se desincronizaran.
+
+La prueba de navegador encontró dos fallos más, que solo aparecen con DOM: un
+campo «Ubicación» cuyo `name` es `ubicacionEmpresa` se clasificaba como nombre
+de empresa, y un campo de fila suelto subía por el DOM hasta `body` y adoptaba
+el documento entero como bloque.
+
 ### Pendiente (ver sección 9)
 
 Lectura automática de las alertas de empleo del correo, Recetas por portal y Redactor.
@@ -217,6 +253,7 @@ Candados vigentes:
 - `tests/hoja-de-vida-contract.mjs` — la hoja de vida se convierte en perfil **sin inventar**: lo que el documento no dice queda vacío y se reporta como pendiente.
 - `tests/vacantes-contract.mjs` — los filtros descartan lo que deben, ante la duda la vacante pasa con advertencia, y el puntaje es auditable.
 - `tests/tablero-contract.mjs` — el tablero no inventa fechas, no pierde historial, no duplica la misma vacante y acierta en «qué toca hoy».
+- `tests/experiencia-contract.mjs` — un campo de fila no es un campo del perfil, cada bloque recibe su empleo y las fechas se reparten entre las casillas.
 - `tests/proyecto-contract.mjs` — `AGENTS.md`, `README.md` y el manifiesto conservan su estructura obligatoria; ningún archivo del repositorio contiene datos personales reales; ningún archivo de código queda tapado por `.gitignore` y ningún archivo de datos personales queda sin tapar; los workflows se pueden parsear.
 
 ### Compuertas de POSTULA CI
@@ -305,7 +342,7 @@ Salvo que el usuario repriorice explícitamente:
 
 Cuando no haya PR abierto ni pedido explícito del usuario, continuar en este orden después de verificar que el código no lo haya hecho ya:
 
-1. **Endurecer el reconocimiento de campos** con casos reales encontrados al postularse. Cada campo que falle en un portal real se convierte en un caso de `tests/matcher-contract.mjs` y, si depende del DOM, en un formulario nuevo bajo `tests/navegador/`.
+1. **Endurecer el reconocimiento de campos** con casos reales encontrados al postularse. Cada campo que falle en un portal real se convierte en un caso de `tests/matcher-contract.mjs` y, si depende del DOM, en un formulario nuevo bajo `tests/navegador/`. Ya dio su primer resultado: el historial laboral por bloques de la Entrega 5 salió de una postulación real en elempleo.com. Lo siguiente que falte en un portal se trata igual.
 2. **Endurecer el tablero con uso real.** Existe (`herramientas/tablero.mjs`) pero nadie lo ha usado durante una búsqueda de verdad. Los estados, los plazos de seguimiento y el umbral de tres semanas son supuestos, no observaciones.
 3. **Radar de vacantes** — la mitad del filtrado ya existe en `herramientas/vacantes.mjs`, pero la lista se arma a mano. Falta leer las alertas de empleo que los portales envían al correo del usuario para armarla sola. Sin scraping: el usuario activa las alertas y POSTULA solo lee su propio buzón, con su autorización.
 4. **Recetas por portal** — ajustes específicos para formularios difíciles, cuando el motor genérico no alcance.
@@ -337,6 +374,7 @@ docs/               referencias técnicas y de producto durables
 extension/          la extensión completa, cargable tal cual en el navegador
   lib/              lógica compartida (perfil, normalización)
   content/          código que se inyecta en la página del portal
+                    (matcher, experiencia y autorrelleno, en ese orden)
   iconos/           iconos de la extensión
 herramientas/       programas de terminal (node, sin dependencias)
   lib/              lectura de PDF, hoja de vida, criterios, puntaje y tablero
