@@ -76,6 +76,10 @@ export function serverEnv(): ServerEnv {
 const connectorSchema = z.object({
   DROPBOX_APP_KEY: z.string().min(5),
   DROPBOX_APP_SECRET: z.string().min(5),
+  // Google es opcional: el despliegue puede empezar solo con Dropbox mientras
+  // corre el tramite de verificacion, que tarda semanas.
+  GOOGLE_CLIENT_ID: z.string().min(5).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(5).optional(),
   // Firma el parametro `state` de OAuth2. Secreto propio y no reutilizado:
   // una clave de cifrado no debe usarse tambien para firmar.
   OAUTH_STATE_SECRET: z.string().min(32),

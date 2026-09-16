@@ -269,6 +269,11 @@ export type CloudConnectionRow = {
   default_profile_id: string | null;
   /** `pageToken` en Drive, `cursor` en Dropbox: permite escaneo incremental. */
   delta_cursor: string | null;
+  drive_start_page_token: string | null;
+  /** Cadencia propia de esta conexion, en minutos. */
+  scan_interval_minutes: number;
+  /** Permite pausar la ingesta sin desconectar ni perder el cursor. */
+  scan_enabled: boolean;
   last_scan_at: string | null;
   last_error: string | null;
   created_by: string | null;

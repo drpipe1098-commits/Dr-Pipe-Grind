@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Readable, Transform } from 'node:stream';
+import { cloudClientFor } from '@/lib/connectors/clients';
 import { loadActiveConnection } from '@/lib/connectors/connection';
-import { downloadFile } from '@/lib/connectors/dropbox';
 import { buildInboxKey, deleteObject, uploadStream } from '@/lib/r2';
 import { createServiceClient } from '@/lib/supabase/service';
 import { mediaTypeOf, mimeTypeOf } from './media-types';
@@ -102,9 +102,9 @@ export async function handleIngest(payload: IngestPayload): Promise<IngestOutcom
     },
   });
 
-  const webStream = await downloadFile({
+  const webStream = await cloudClientFor(connection.row.provider).download({
     accessToken: connection.accessToken,
-    pathOrId: item.remote_file_id,
+    fileId: item.remote_file_id,
   });
 
   await uploadStream({

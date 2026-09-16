@@ -15,7 +15,9 @@
     "organizations": "Organizaciones",
     "jobs": "Procesamiento",
     "settings": "Ajustes",
-    "signOut": "Cerrar sesion"
+    "signOut": "Cerrar sesion",
+    "triage": "Triaje",
+    "connectors": "Conectores"
   },
   "roles": {
     "admin": "Admin de plataforma",
@@ -68,5 +70,28 @@
     "unauthorized": "No tienes acceso a esta seccion.",
     "notFound": "No encontrado.",
     "generic": "Algo salio mal. Intenta de nuevo."
+  },
+  "triage": {
+    "title": "Triaje de ingesta",
+    "intro": "Archivos encontrados en la nube que no se pudieron asignar a ninguna modelo. Todavia no se han descargado: asignarlos es lo que dispara la descarga.",
+    "empty": "Nada pendiente de triaje",
+    "emptyHint": "Cuando un escaneo encuentre archivos que no pueda asignar solo, apareceran aqui.",
+    "selectAll": "Seleccionar todo",
+    "clearAll": "Quitar seleccion",
+    "selectedCount": "{count} seleccionados",
+    "choose": "Elegir modelo...",
+    "assign": "Asignar y descargar",
+    "assigned": "{assigned} asignados. {untouched} sin cambios (alguien los asigno antes).",
+    "noFolder": "Sin subcarpeta",
+    "filesInFolder": "{count} archivos",
+    "errors": {
+      "sin_seleccion": "No hay nada seleccionado.",
+      "lote_demasiado_grande": "Demasiados archivos de una vez: maximo 200 por lote.",
+      "datos_invalidos": "La seleccion no es valida.",
+      "sin_sesion": "Tu sesion caduco. Vuelve a entrar.",
+      "perfil_no_encontrado": "Esa modelo no existe en tu agencia.",
+      "sin_permiso": "No tienes permiso para asignar en esta agencia.",
+      "no_se_pudo_asignar": "No se pudo completar la asignacion. Intenta de nuevo."
+    }
   }
 }

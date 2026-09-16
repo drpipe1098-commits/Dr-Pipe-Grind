@@ -1,5 +1,16 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Film, BarChart3, CalendarClock, Link2, Wallet, ShieldCheck, Users, Cpu } from 'lucide-react';
+import {
+  Film,
+  BarChart3,
+  CalendarClock,
+  Link2,
+  Wallet,
+  ShieldCheck,
+  Users,
+  Cpu,
+  Inbox,
+  Cloud,
+} from 'lucide-react';
 import { Link, redirect } from '@/i18n/routing';
 import { getAuthContext } from '@/lib/auth';
 import type { UserRole } from '@/lib/database.types';
@@ -22,6 +33,8 @@ const NAV: Record<UserRole, { href: string; labelKey: string; Icon: typeof Film 
   studio: [
     { href: '/studio', labelKey: 'dashboard', Icon: BarChart3 },
     { href: '/studio/vault', labelKey: 'vault', Icon: Film },
+    { href: '/studio/triage', labelKey: 'triage', Icon: Inbox },
+    { href: '/studio/conectores', labelKey: 'connectors', Icon: Cloud },
     { href: '/studio/schedule', labelKey: 'schedule', Icon: CalendarClock },
     { href: '/studio/links', labelKey: 'links', Icon: Link2 },
     { href: '/studio/compliance', labelKey: 'compliance', Icon: ShieldCheck },
@@ -30,6 +43,8 @@ const NAV: Record<UserRole, { href: string; labelKey: string; Icon: typeof Film 
   editor: [
     { href: '/studio', labelKey: 'dashboard', Icon: BarChart3 },
     { href: '/studio/vault', labelKey: 'vault', Icon: Film },
+    // El triaje es trabajo de ingesta: el editor decide que material entra.
+    { href: '/studio/triage', labelKey: 'triage', Icon: Inbox },
     { href: '/studio/schedule', labelKey: 'schedule', Icon: CalendarClock },
   ],
   model: [

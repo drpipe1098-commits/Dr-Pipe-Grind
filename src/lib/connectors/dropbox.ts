@@ -1,5 +1,7 @@
 import 'server-only';
 
+import type { CloudClient, ListContext, RemoteFile, RemoteListing } from './provider';
+
 /**
  * Cliente de la API de Dropbox.
  *
@@ -302,4 +304,45 @@ export async function downloadFile(input: {
   }
 
   return response.body;
+}
+
+/**
+ * Adaptador a la interfaz comun de proveedores.
+ *
+ * Dropbox encaja casi sin traduccion: tiene rutas de verdad y listado recursivo
+ * nativo, y el mismo cursor sirve para paginar y para incrementar.
+ */
+export const dropboxClient: CloudClient = {
+  provider: 'dropbox',
+
+  async listInitial(context: ListContext): Promise<RemoteListing> {
+    const listing = await listFolder({
+      accessToken: context.accessToken,
+      path: context.rootPath,
+    });
+    return { files: listing.files.map(toRemoteFile), cursor: listing.cursor, hasMore: listing.hasMore };
+  },
+
+  async listIncremental(context): Promise<RemoteListing> {
+    const listing = await listFolderContinue({
+      accessToken: context.accessToken,
+      cursor: context.cursor,
+    });
+    return { files: listing.files.map(toRemoteFile), cursor: listing.cursor, hasMore: listing.hasMore };
+  },
+
+  async download(input): Promise<ReadableStream<Uint8Array>> {
+    return downloadFile({ accessToken: input.accessToken, pathOrId: input.fileId });
+  },
+};
+
+function toRemoteFile(file: DropboxFile): RemoteFile {
+  return {
+    id: file.id,
+    name: file.name,
+    path: file.pathDisplay,
+    sizeBytes: file.sizeBytes,
+    modifiedAt: file.serverModified,
+    checksum: file.contentHash,
+  };
 }

@@ -17,11 +17,14 @@
 import type { JobRow } from '@/lib/database.types';
 import { createServiceClient } from '@/lib/supabase/service';
 import { handleIngest, type IngestPayload } from './ingest';
+import { enqueueDueScans } from './scheduler';
 import { handleScan, type ScanPayload } from './scan';
 
 const WORKER_NAME = process.env.WORKER_NAME ?? `ingest-${process.pid}`;
 const BATCH_SIZE = Number(process.env.INGEST_WORKER_BATCH_SIZE ?? '2');
 const POLL_SECONDS = Number(process.env.INGEST_WORKER_POLL_SECONDS ?? '10');
+/** Cada cuanto revisa el programador si toca escanear alguna conexion. */
+const SCHEDULER_TICK_SECONDS = Number(process.env.SCHEDULER_TICK_SECONDS ?? '300');
 
 let stopRequested = false;
 
@@ -84,6 +87,25 @@ async function tick(): Promise<number> {
   return claimed.length;
 }
 
+/**
+ * Revision periodica del programador.
+ *
+ * Un fallo aqui no debe tumbar el worker: encolar escaneos es importante, pero
+ * procesar los que ya estan en la cola lo es mas.
+ */
+async function schedulerTick(): Promise<void> {
+  try {
+    const outcome = await enqueueDueScans();
+    if (outcome.enqueued > 0 || outcome.alreadyQueued > 0) {
+      log('programador', { ...outcome });
+    }
+  } catch (error) {
+    log('el programador fallo', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function main(): Promise<void> {
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.on(signal, () => {
@@ -92,10 +114,28 @@ async function main(): Promise<void> {
     });
   }
 
-  log('worker de ingesta en marcha', { lote: BATCH_SIZE, sondeo: POLL_SECONDS });
+  log('worker de ingesta en marcha', {
+    lote: BATCH_SIZE,
+    sondeo: POLL_SECONDS,
+    programador: SCHEDULER_TICK_SECONDS,
+  });
+
+  // Primera pasada nada mas arrancar: si el worker estuvo caido, hay escaneos
+  // atrasados y no tiene sentido esperar cinco minutos mas para verlos.
+  await schedulerTick();
+  let lastSchedulerRun = Date.now();
 
   while (!stopRequested) {
+    if (Date.now() - lastSchedulerRun >= SCHEDULER_TICK_SECONDS * 1000) {
+      await schedulerTick();
+      lastSchedulerRun = Date.now();
+    }
+
     const processed = await tick();
+
+    // Solo se duerme cuando no habia nada que hacer. Con trabajo en la cola, se
+    // sigue de largo: dormir con la cola llena multiplica la latencia de una
+    // ingesta de cien archivos por el tiempo de sondeo.
     if (processed === 0 && !stopRequested) {
       await new Promise((resolve) => setTimeout(resolve, POLL_SECONDS * 1000));
     }

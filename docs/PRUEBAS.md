@@ -7,8 +7,8 @@ las agrega.
 |---|---|---|
 | `linters` | ESLint sobre todo el proyecto | `npm run lint` |
 | `typescript` | `tsc --noEmit` en modo estricto | `npm run typecheck` |
-| `unidad` | 141 casos: Hard Rule, cifrado, limite, textos y conectores | `npm test` |
-| `aislamiento RLS` | 88 aserciones contra PostgreSQL real | `npm run test:rls` |
+| `unidad` | 164 casos: Hard Rule, cifrado, limite, textos, conectores y triaje | `npm test` |
+| `aislamiento RLS` | 97 aserciones contra PostgreSQL real | `npm run test:rls` |
 | `build` | Compilacion de produccion de Next | `npm run build` |
 | `workers python` | Sintaxis y la barrera anti-doxxing | `python workers/verificar_sanitizacion.py` |
 | `imagenes docker` | Construye las tres imagenes y valida el compose | `docker compose build` |
@@ -92,9 +92,15 @@ esperar una excepcion. Comprobarlo con un `assert_rejected` daria un falso verde
 - **Las imagenes Docker se construyen en CI, no en local.** La politica de red
   del entorno de desarrollo bloquea el registro de Docker Hub, asi que la
   comprobacion de que compilan ocurre en GitHub Actions.
-- **El cliente HTTP de Dropbox no se ha ejecutado contra la API real.** El
-  entorno de desarrollo no alcanza internet. Lo probado es el enrutado, el estado
-  de OAuth2, el filtro de tipos y el recorrido de la cola; el intercambio de
-  tokens, el listado y la descarga siguen sin comprobar contra Dropbox.
+- **Los clientes HTTP de Dropbox y Drive no se han ejecutado contra las APIs
+  reales.** El entorno de desarrollo no alcanza internet. Lo probado es el
+  enrutado, el programador, el triaje, el estado de OAuth2, el filtro de tipos y
+  el recorrido de la cola; el intercambio de tokens, el listado y la descarga
+  siguen sin comprobar contra los proveedores.
+- **El panel de triaje no tiene pruebas de navegador.** Lo probado de esa
+  pantalla es su logica —validacion del lote, tope, repetidos, resumen— y sus
+  garantias en la base: que un editor asigne dentro de su agencia, que no se
+  pueda asignar a una modelo de otra, y que un estudio ajeno no toque la cola.
+  El renderizado y la seleccion no estan cubiertos.
 - **Ningun runner de publicacion existe todavia.** El Modulo 5 esta modelado en
   la base pero no implementado.

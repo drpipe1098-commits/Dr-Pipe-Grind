@@ -4,7 +4,8 @@ import type { CloudConnectionRow, CloudProvider } from '@/lib/database.types';
 import { decryptSecret, encryptSecret } from '@/lib/crypto/secrets';
 import { connectorEnv } from '@/lib/env';
 import { createServiceClient } from '@/lib/supabase/service';
-import { DropboxError, refreshAccessToken } from './dropbox';
+import { DropboxError, refreshAccessToken as refreshDropbox } from './dropbox';
+import { GoogleDriveError, refreshAccessToken as refreshDrive } from './google-drive';
 
 /**
  * Ciclo de vida de una conexion de nube: guardar, cargar y refrescar.
@@ -13,6 +14,17 @@ import { DropboxError, refreshAccessToken } from './dropbox';
  * que `credentials.ts` lo es para los tokens de publicacion. Escribir en
  * `cloud_connections` directamente guardaria el refresh token en claro.
  */
+
+/** Credenciales de la aplicacion de Google, comprobadas al usarse. */
+function driveCredentials(): { clientId: string; clientSecret: string } {
+  const env = connectorEnv();
+  if (env.GOOGLE_CLIENT_ID === undefined || env.GOOGLE_CLIENT_SECRET === undefined) {
+    throw new Error(
+      'Google Drive no esta configurado: faltan GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET.',
+    );
+  }
+  return { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET };
+}
 
 /**
  * Contexto criptografico. Ata el token a su organizacion y proveedor: copiar el
@@ -33,6 +45,8 @@ export interface StoreConnectionInput {
   expiresInSeconds: number;
   scopes: string[];
   rootFolderPath: string | null;
+  /** Drive identifica carpetas por id opaco; Dropbox, por ruta. */
+  rootFolderId?: string | null;
   createdBy: string | null;
 }
 
@@ -53,6 +67,7 @@ export async function storeCloudConnection(
     scopes: input.scopes,
     status: 'active' as const,
     root_folder_path: input.rootFolderPath,
+    root_folder_id: input.rootFolderId ?? null,
     last_error: null,
     created_by: input.createdBy,
   };
@@ -111,13 +126,17 @@ export async function loadActiveConnection(
   }
 
   const env = connectorEnv();
+  const refreshToken = decryptSecret(row.refresh_ciphertext, context);
 
   try {
-    const refreshed = await refreshAccessToken({
-      refreshToken: decryptSecret(row.refresh_ciphertext, context),
-      appKey: env.DROPBOX_APP_KEY,
-      appSecret: env.DROPBOX_APP_SECRET,
-    });
+    const refreshed =
+      row.provider === 'dropbox'
+        ? await refreshDropbox({
+            refreshToken,
+            appKey: env.DROPBOX_APP_KEY,
+            appSecret: env.DROPBOX_APP_SECRET,
+          })
+        : await refreshDrive({ refreshToken, ...driveCredentials() });
 
     const newExpiry = new Date(Date.now() + refreshed.expiresInSeconds * 1000).toISOString();
 
@@ -135,7 +154,11 @@ export async function loadActiveConnection(
       accessToken: refreshed.accessToken,
     };
   } catch (error) {
-    const needsReconnect = error instanceof DropboxError && error.needsReconnect;
+    // Ambos proveedores distinguen "hay que reconectar" de "fallo pasajero": en
+    // los dos, `invalid_grant` significa revocacion y reintentar no lo arregla.
+    const needsReconnect =
+      (error instanceof DropboxError || error instanceof GoogleDriveError) &&
+      error.needsReconnect;
     await markConnection(
       connectionId,
       needsReconnect ? 'expired' : 'error',

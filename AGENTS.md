@@ -108,7 +108,20 @@ preguntar.
     PostgREST solo expone `public`. El envoltorio delega y no duplica logica, y
     esta concedido solo a `service_role`.
 
-18. **Una tabla nueva nace SIN privilegios para `authenticated`.** El
+18. **En el triaje, el cliente de servicio solo toca lo que el RLS devolvio.**
+    Primero se actualizan los items con el cliente de sesion; despues se encolan
+    trabajos SOLO para los ids que ese UPDATE devolvio. Al reves, una peticion con
+    ids ajenos encolaria descargas de material de otra agencia.
+
+19. **La coordinacion entre replicas del worker vive en la base, no en el
+    programador.** `jobs_one_live_scan_per_connection` es la unica capa que ven
+    todas a la vez. El rechazo por duplicado es el caso normal, no un error.
+
+20. **Google exige `prompt=consent` ademas de `access_type=offline`.** Sin lo
+    primero, una cuenta que ya autorizo antes no recibe refresh token y la
+    conexion nace muerta sin ningun error visible.
+
+21. **Una tabla nueva nace SIN privilegios para `authenticated`.** El
     `grant ... on all tables` de la migracion 000900 solo alcanzo a las que
     existian entonces; el sintoma es un "permission denied" que no menciona el
     RLS por ningun lado. La migracion 001200 dejo puesto un
@@ -128,8 +141,8 @@ docker ────┘
 ```
 
 `rls` levanta un PostgreSQL 16 de servicio, aplica el arranque de auth que
-reproduce lo que Supabase da de fabrica, corre las quince migraciones y ejecuta las
-88 aserciones.
+reproduce lo que Supabase da de fabrica, corre las dieciseis migraciones y ejecuta las
+97 aserciones.
 
 La compuerta `docker` construye las dos imagenes de verdad. Existe porque el
 despliegue es por contenedores: un Dockerfile roto no se descubriria al hacer
@@ -146,7 +159,10 @@ merge sino al intentar desplegar.
 | `src/lib/captions/validator.ts` | Filtro estricto y el tipo `PublishableCaption` |
 | `src/lib/captions/provider.ts` | Interfaz del generador; hoy un simulado |
 | `src/lib/captions/pipeline.ts` | Generar -> validar -> reintentar -> fallar cerrado |
+| `src/lib/connectors/provider.ts` | Interfaz comun de nubes; `clients.ts` la factoria |
 | `src/lib/connectors/routing.ts` | Enrutado hibrido, codigo puro |
+| `src/lib/connectors/triage.ts` | Reglas del lote de asignacion |
+| `src/workers/ingest/scheduler.ts` | Que conexiones toca escanear |
 | `src/lib/connectors/connection.ts` | Unico camino de entrada y salida de los tokens de nube |
 | `src/workers/ingest/` | Worker de ingesta en Node |
 | `tsconfig.workers.json` | Sustituye `server-only` para ejecutar fuera de Next |
@@ -165,7 +181,7 @@ merge sino al intentar desplegar.
 | Modulo | Estado |
 |---|---|
 | 1 — Roles y aislamiento | Completo y probado |
-| 2 — Ingesta y vault | Subidas y Dropbox completos (OAuth, escaneo, enrutado, dedupe). Falta Google Drive y la pantalla de triaje |
+| 2 — Ingesta y vault | Completo: subidas, Dropbox, Drive, triaje y escaneo automatico. Falta ejecutarlo contra las APIs reales |
 | 3 — Pipeline de medios | Workers escritos; solo la sanitizacion EXIF esta verificada |
 | 4 — Hard Rule | Motor y validador de textos completos y probados. Falta conectar un proveedor de IA real |
 | 5 — Distribucion | Modelado en la base; **ningun runner implementado** |
@@ -201,8 +217,14 @@ merge sino al intentar desplegar.
 - **Los diccionarios de terminos penalizados son heuristicas observadas**, no
   reglas publicadas. Ninguna plataforma documenta su lista; habra que ajustarlos
   cuando cambie el comportamiento real.
-- **La integracion con Dropbox no se ha ejecutado nunca contra la API real.** El
+- **Las integraciones no se han ejecutado nunca contra las APIs reales.** El
   entorno de desarrollo no alcanza internet. La primera conexion de verdad sigue
-  siendo la prueba que falta.
-- **El escaneo hay que encolarlo a mano.** Falta decidir la cadencia y quien
-  dispara `scan_cloud_folder`.
+  siendo la prueba que falta, en Dropbox y en Drive.
+- **El alcance `drive.readonly` exige verificacion de Google**, con un limite de
+  100 usuarios mientras tanto. El codigo esta listo; el tramite manda.
+- **El primer recorrido de un Drive muy grande puede necesitar varias pasadas.**
+  Tiene un presupuesto de 200 paginas; si se agota no guarda cursor y la
+  siguiente vuelve a empezar. Rehacerlo es barato (los upsert absorben lo ya
+  registrado, no se descarga nada) pero no es instantaneo.
+- **El panel de triaje no tiene pruebas de navegador.** Su logica y sus garantias
+  en la base si estan cubiertas; el renderizado y la seleccion, no.

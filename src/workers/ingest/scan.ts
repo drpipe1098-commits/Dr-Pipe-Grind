@@ -1,10 +1,11 @@
+import { cloudClientFor, needsReconnect } from '@/lib/connectors/clients';
 import { loadActiveConnection, markConnection } from '@/lib/connectors/connection';
-import { DropboxError, listFolder, listFolderContinue } from '@/lib/connectors/dropbox';
 import {
   routeToProfile,
   type AssignmentSource,
   type RoutableProfile,
 } from '@/lib/connectors/routing';
+import type { RemoteFile } from '@/lib/connectors/provider';
 import { createServiceClient } from '@/lib/supabase/service';
 import { isJunkFile, isSupportedMedia, mimeTypeOf } from './media-types';
 
@@ -66,6 +67,16 @@ export async function handleScan(payload: ScanPayload): Promise<ScanOutcome> {
     skipped: 0,
   };
 
+  // El cliente del proveedor esconde las diferencias entre nubes: Dropbox tiene
+  // rutas y listado recursivo; Drive, identificadores opacos y un arbol que hay
+  // que recorrer. Aqui abajo ya da igual cual sea.
+  const client = cloudClientFor(row.provider);
+  const listContext = {
+    accessToken,
+    rootPath: row.root_folder_path,
+    rootId: row.root_folder_id,
+  };
+
   let cursor = row.delta_cursor;
   let pages = 0;
 
@@ -73,8 +84,8 @@ export async function handleScan(payload: ScanPayload): Promise<ScanOutcome> {
     while (pages < MAX_PAGES_PER_RUN) {
       const listing =
         cursor === null
-          ? await listFolder({ accessToken, path: row.root_folder_path })
-          : await listFolderContinue({ accessToken, cursor });
+          ? await client.listInitial(listContext)
+          : await client.listIncremental({ ...listContext, cursor });
 
       pages += 1;
       cursor = listing.cursor;
@@ -100,7 +111,7 @@ export async function handleScan(payload: ScanPayload): Promise<ScanOutcome> {
         const twin = await findTwinByRemoteChecksum(
           supabase,
           row.organization_id,
-          file.contentHash,
+          file.checksum,
           file.id,
         );
 
@@ -118,7 +129,7 @@ export async function handleScan(payload: ScanPayload): Promise<ScanOutcome> {
         }
 
         const decision = routeToProfile({
-          remotePath: file.pathDisplay,
+          remotePath: file.path,
           rootPath: row.root_folder_path,
           defaultProfileId: row.default_profile_id,
           profiles,
@@ -162,8 +173,12 @@ export async function handleScan(payload: ScanPayload): Promise<ScanOutcome> {
 
     return outcome;
   } catch (error) {
-    if (error instanceof DropboxError && error.needsReconnect) {
-      await markConnection(row.id, 'expired', error.message);
+    if (needsReconnect(error)) {
+      await markConnection(
+        row.id,
+        'expired',
+        error instanceof Error ? error.message : 'acceso revocado',
+      );
     }
     throw error;
   }
@@ -196,14 +211,7 @@ async function upsertItem(
   input: {
     connectionId: string;
     organizationId: string;
-    file: {
-      id: string;
-      name: string;
-      pathDisplay: string;
-      sizeBytes: number;
-      serverModified: string;
-      contentHash: string | null;
-    };
+    file: RemoteFile;
     status: 'queued' | 'unassigned' | 'duplicate' | 'skipped';
     profileId?: string | null;
     assignmentSource?: AssignmentSource | null;
@@ -220,11 +228,11 @@ async function upsertItem(
         organization_id: input.organizationId,
         remote_file_id: input.file.id,
         remote_name: input.file.name,
-        remote_path: input.file.pathDisplay,
+        remote_path: input.file.path,
         remote_mime_type: mimeTypeOf(input.file.name),
         remote_size_bytes: input.file.sizeBytes,
-        remote_modified_at: input.file.serverModified,
-        remote_checksum: input.file.contentHash,
+        remote_modified_at: input.file.modifiedAt,
+        remote_checksum: input.file.checksum,
         status: input.status,
         profile_id: input.profileId ?? null,
         assignment_source: input.assignmentSource ?? null,

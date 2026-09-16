@@ -4,9 +4,8 @@ Escanear Google Drive y Dropbox en busca de material antiguo y traerlo al vault.
 Es el reciclador del Modulo 2: casi toda agencia tiene años de sesiones en una
 carpeta compartida que nadie vuelve a abrir.
 
-**Estado: Dropbox implementado.** OAuth2, escaneo, enrutado, deduplicacion e
-ingesta a R2. Google Drive sigue pendiente: mismo esquema, otro archivo en
-`providers/`, y el tramite de verificacion corriendo en paralelo.
+**Estado: Dropbox y Google Drive implementados**, con panel de triaje y escaneo
+automatico. Falta ejecutarlo contra las APIs reales.
 
 ---
 
@@ -40,19 +39,28 @@ Los workers de medios se quedan en Python. No hay razon para tocarlos.
 
 ```
 src/lib/connectors/
-  dropbox.ts          Cliente HTTP de la API de Dropbox
+  provider.ts         Interfaz comun CloudClient
+  clients.ts          Factoria por proveedor
+  dropbox.ts          Cliente HTTP de Dropbox + adaptador
+  google-drive.ts     Cliente HTTP de Drive + adaptador
   connection.ts       Guarda, carga y refresca conexiones (cifra los tokens)
   routing.ts          Enrutado hibrido — codigo puro, muy probado
+  triage.ts           Reglas de la asignacion en lote
   oauth-state.ts      Firma y verifica el parametro `state`
 src/workers/ingest/
-  index.ts            Bucle: toma trabajos de la cola y despacha
+  index.ts            Bucle + programador
+  scheduler.ts        Decide a que conexiones les toca escaneo
   scan.ts             scan_cloud_folder:  descubre, enruta y encola
   ingest.ts           ingest_cloud_file:  descarga, deduplica y crea el asset
   media-types.ts      Que archivos merece la pena traer
-src/app/api/conectores/dropbox/
-  start/              Inicia el flujo OAuth2
-  callback/           Retorno: valida, intercambia y guarda la conexion
+src/app/[locale]/(panel)/studio/triage/   Panel de triaje
+src/app/api/conectores/{dropbox,google}/  Inicio y retorno de OAuth2
 ```
+
+La interfaz `CloudClient` esconde diferencias que no son menores: Dropbox tiene
+rutas y listado recursivo nativo; Drive, identificadores opacos y un arbol que
+hay que recorrer carpeta por carpeta reconstruyendo las rutas. Por encima de esa
+interfaz, `scan.ts` e `ingest.ts` no distinguen una nube de otra.
 
 Despliegue: servicio `ingest` en `docker-compose.yml`, con su propia imagen
 (`workers/ingest.Dockerfile`). No necesita FFmpeg, asi que es mucho mas ligera
@@ -177,15 +185,56 @@ reintentar en bucle es como se acaba en la lista negra del proveedor.
 
 ---
 
+## Panel de triaje
+
+`/studio/triage` lista lo que quedo en `unassigned`, agrupado por la subcarpeta
+que se intento emparejar — quien hace el triaje casi siempre asigna una carpeta
+entera a la misma modelo, no archivo por archivo. Muestra la ruta original como
+contexto, que es lo que permite decidir de quien es cada cosa.
+
+La asignacion en lote reparte el trabajo entre los dos clientes de Supabase, y
+el orden importa:
+
+1. Los items se cambian con el cliente de **sesion**, sujeto a RLS. Eso garantiza
+   que nadie asigne archivos de otra organizacion, y no depende de que la
+   comprobacion de permisos de la capa de arriba sea correcta.
+2. Los trabajos de descarga se encolan con la clave de **servicio**, porque
+   `jobs` no tiene politica de INSERT para clientes — pero solo para los
+   identificadores que el UPDATE anterior devolvio. El cliente de servicio nunca
+   toca un id que el RLS no haya autorizado ya.
+
+Al reves —encolar primero y comprobar despues— una peticion con ids ajenos
+encolaria descargas de material de otra agencia.
+
+Dos detalles mas: el UPDATE exige `status = 'unassigned'`, asi que no pisa lo que
+otra persona asigno mientras la pantalla estaba abierta; y el lote esta topado en
+200 archivos, porque su tamano lo elige el cliente y mil descargas de golpe dejan
+la cola sin margen durante horas.
+
+## Escaneo automatico
+
+El estudio no pulsa ningun boton. El programador vive dentro del worker, que ya
+es un proceso persistente: ni cron del sistema, ni contenedor aparte, ni
+dependencia nueva. Cada conexion lleva su propia cadencia
+(`scan_interval_minutes`, por defecto 30) porque un estudio que sube a diario y
+un archivo historico de 2023 no necesitan lo mismo.
+
+Con varias replicas del worker, todas despiertan y todas intentan encolar los
+mismos escaneos. Eso **no se resuelve en el codigo del programador** sino en la
+base: el indice `jobs_one_live_scan_per_connection` deja pasar uno solo. Es la
+unica capa que ven todas las replicas a la vez, y el rechazo por duplicado se
+trata como el caso normal que es, no como un error.
+
 ## Lo que falta
 
-- **Google Drive.** Mismo esquema y mismos trabajos; cambia el cliente HTTP y el
-  formato del cursor. El tramite de verificacion es lo que marca el calendario,
-  no el codigo.
-- **Pantalla de triaje.** El backend deja los archivos en `unassigned` con la
-  carpeta que se intento; falta la vista donde el estudio los asigna.
-- **Escaneo programado.** Hoy el trabajo `scan_cloud_folder` hay que encolarlo a
-  mano. Falta decidir la cadencia (¿cada hora? ¿cada noche?) y quien lo dispara.
-- **Prueba contra Dropbox real.** Nada de esto se ha ejecutado contra la API: el
-  entorno de desarrollo no alcanza internet. El enrutado, el estado de OAuth y el
-  filtro de tipos estan probados; el cliente HTTP, no.
+- **Ejecutarlo contra las APIs reales.** Nada de esto ha hablado con Dropbox ni
+  con Google: el entorno de desarrollo no alcanza internet. Estan probados el
+  enrutado, el programador, el triaje, el estado de OAuth2 y el filtro de tipos;
+  los clientes HTTP, no.
+- **Verificacion de Google.** El alcance `drive.readonly` es sensible y exige
+  revision, con un limite de 100 usuarios mientras tanto. El codigo ya esta; el
+  tramite marca el calendario.
+- **Primer recorrido de un Drive enorme.** Tiene un presupuesto de 200 paginas
+  por ejecucion. Si se agota, no se guarda cursor y la siguiente vuelve a
+  empezar: rehacerlo es barato porque los upsert absorben lo ya registrado y no
+  se descarga nada, pero un Drive muy grande puede necesitar varias pasadas.

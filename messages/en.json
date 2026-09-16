@@ -15,7 +15,9 @@
     "organizations": "Organizations",
     "jobs": "Processing",
     "settings": "Settings",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "triage": "Triage",
+    "connectors": "Connectors"
   },
   "roles": {
     "admin": "Platform admin",
@@ -68,5 +70,28 @@
     "unauthorized": "You do not have access to this section.",
     "notFound": "Not found.",
     "generic": "Something went wrong. Please try again."
+  },
+  "triage": {
+    "title": "Ingest triage",
+    "intro": "Files found in the cloud that could not be matched to a model. They are not downloaded yet: assigning them is what starts the download.",
+    "empty": "Nothing to triage",
+    "emptyHint": "When a scan finds files it cannot assign on its own, they show up here.",
+    "selectAll": "Select all",
+    "clearAll": "Clear selection",
+    "selectedCount": "{count} selected",
+    "choose": "Choose model...",
+    "assign": "Assign and download",
+    "assigned": "{assigned} assigned. {untouched} unchanged (someone assigned them first).",
+    "noFolder": "No subfolder",
+    "filesInFolder": "{count} files",
+    "errors": {
+      "sin_seleccion": "Nothing selected.",
+      "lote_demasiado_grande": "Too many files at once: 200 per batch maximum.",
+      "datos_invalidos": "The selection is not valid.",
+      "sin_sesion": "Your session expired. Please sign in again.",
+      "perfil_no_encontrado": "That model does not exist in your agency.",
+      "sin_permiso": "You do not have permission to assign in this agency.",
+      "no_se_pudo_asignar": "The assignment could not be completed. Please try again."
+    }
   }
 }

@@ -185,5 +185,90 @@ select tests.assert(
   (select status = 'done' from public.jobs where claimed_by = 'ingest-1' limit 1),
   'cerrar por el envoltorio deja el trabajo en done');
 
+\echo '== P. Triaje y cadencia de escaneo =='
+
+reset role;
+insert into public.cloud_ingest_items
+  (id, connection_id, organization_id, remote_file_id, remote_name, remote_path,
+   remote_mime_type, remote_size_bytes, status, matched_folder, skip_reason)
+values
+  ('00000000-0000-0000-0000-000000000e91', '00000000-0000-0000-0000-000000000d01',
+   '00000000-0000-0000-0000-0000000000aa', 'drive-file-091', 'sin-duena.jpg',
+   '/Modelos/carpeta-vieja/sin-duena.jpg', 'image/jpeg', 1200000,
+   'unassigned', 'carpeta-vieja', 'sin_coincidencia');
+
+-- El editor hace el triaje: decide que material entra.
+select set_config('request.jwt.claims', json_build_object('sub', :'editor_a')::text, false);
+set role authenticated;
+
+select tests.assert_count(
+  'select * from public.cloud_ingest_items where status = ''unassigned''', 1,
+  'el editor ve la cola de triaje de su agencia');
+
+select tests.assert_affects(
+  'update public.cloud_ingest_items
+      set profile_id = ''00000000-0000-0000-0000-000000000f01'',
+          status = ''queued'',
+          assignment_source = ''manual''
+    where id = ''00000000-0000-0000-0000-000000000e91''', 1,
+  'el editor asigna un archivo del triaje a una modelo de su agencia');
+
+-- La clave foranea compuesta es lo que impide asignar a una modelo de otra
+-- agencia. Sin ella, un id de perfil ajeno colado en la peticion bastaria.
+select tests.assert_rejected(
+  'update public.cloud_ingest_items
+      set profile_id = ''00000000-0000-0000-0000-000000000f03''
+    where id = ''00000000-0000-0000-0000-000000000e91''',
+  'NO se puede asignar un archivo a una modelo de otra organizacion');
+
+reset role;
+select set_config('request.jwt.claims', json_build_object('sub', :'studio_b')::text, false);
+set role authenticated;
+select tests.assert_affects(
+  'update public.cloud_ingest_items set status = ''skipped''
+     where id = ''00000000-0000-0000-0000-000000000e91''', 0,
+  'el studio de Beta NO puede tocar el triaje de Alfa');
+
+\echo '== Q. Un solo escaneo vivo por conexion =='
+
+reset role;
+-- El programador corre dentro del worker y puede haber varias replicas. Sin esta
+-- restriccion, cuatro replicas que despiertan a la vez recorren cuatro veces la
+-- misma cuenta.
+delete from public.jobs where job_type = 'scan_cloud_folder';
+
+select tests.assert_affects(
+  'insert into public.jobs (organization_id, job_type, payload)
+   values (''00000000-0000-0000-0000-0000000000aa'', ''scan_cloud_folder'',
+           jsonb_build_object(''connection_id'', ''00000000-0000-0000-0000-000000000d01''))', 1,
+  'el primer escaneo de una conexion se encola');
+
+select tests.assert_rejected(
+  'insert into public.jobs (organization_id, job_type, payload)
+   values (''00000000-0000-0000-0000-0000000000aa'', ''scan_cloud_folder'',
+           jsonb_build_object(''connection_id'', ''00000000-0000-0000-0000-000000000d01''))',
+  'un segundo escaneo de la MISMA conexion se rechaza mientras el primero vive');
+
+select tests.assert_affects(
+  'insert into public.jobs (organization_id, job_type, payload)
+   values (''00000000-0000-0000-0000-0000000000bb'', ''scan_cloud_folder'',
+           jsonb_build_object(''connection_id'', ''00000000-0000-0000-0000-000000000d02''))', 1,
+  'otra conexion si puede encolar el suyo: la restriccion es por conexion');
+
+update public.jobs set status = 'done'
+ where job_type = 'scan_cloud_folder'
+   and payload ->> 'connection_id' = '00000000-0000-0000-0000-000000000d01';
+
+select tests.assert_affects(
+  'insert into public.jobs (organization_id, job_type, payload)
+   values (''00000000-0000-0000-0000-0000000000aa'', ''scan_cloud_folder'',
+           jsonb_build_object(''connection_id'', ''00000000-0000-0000-0000-000000000d01''))', 1,
+  'terminado el anterior, la siguiente pasada vuelve a encolarse');
+
+select tests.assert_rejected(
+  'update public.cloud_connections set scan_interval_minutes = 1
+     where id = ''00000000-0000-0000-0000-000000000d01''',
+  'la cadencia no baja de cinco minutos: escanear cada minuto agota la cuota del proveedor');
+
 \echo ''
 \echo 'Conectores: todas las aserciones pasaron.'

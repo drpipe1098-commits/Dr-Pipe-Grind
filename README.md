@@ -9,7 +9,7 @@ Contexto durable en `AGENTS.md` y `docs/`.
 
 ---
 
-## Estado: Sprint 2, Fase 2 — Ingesta desde Dropbox
+## Estado: Sprint 2, Fases 3-5 — Ecosistema de ingesta completo
 
 Lo que existe y esta verificado:
 
@@ -42,10 +42,13 @@ Lo que existe y esta verificado:
   fallar cerrado, con filtro estricto de terminos, enlaces, longitud y formato
   por plataforma. La garantia de que nada del LLM llega al publicador sin filtrar
   la impone el compilador, no una convencion.
-- **Ingesta desde Dropbox (Modulo 2).** OAuth2 con `state` firmado, escaneo
-  incremental por cursor, enrutado hibrido a perfiles, deduplicacion en dos pasos
-  e ingesta en flujo a R2. Google Drive queda pendiente del tramite de
-  verificacion: ver `docs/CONECTORES.md`.
+- **Ingesta desde Dropbox y Google Drive (Modulo 2).** OAuth2 con `state`
+  firmado, escaneo incremental, enrutado hibrido a perfiles, deduplicacion en dos
+  pasos e ingesta en flujo a R2, todo tras una interfaz comun de proveedor.
+- **Panel de triaje.** Asignacion en lote de los archivos que el enrutado no pudo
+  resolver, agrupados por la carpeta de origen.
+- **Escaneo automatico.** Programador dentro del worker, con cadencia por
+  conexion y un indice en la base que impide escaneos duplicados entre replicas.
 
 ### Validacion
 
@@ -53,8 +56,8 @@ Lo que existe y esta verificado:
 |---|---|
 | ESLint | limpio |
 | TypeScript estricto | limpio |
-| Unidad (Hard Rule, cifrado, limite, textos, conectores) | 141/141 |
-| Aislamiento RLS, limite, conectores y cola | 88/88 contra PostgreSQL 16 |
+| Unidad (Hard Rule, cifrado, limite, textos, conectores) | 164/164 |
+| Aislamiento RLS, limite, conectores, triaje y cola | 97/97 contra PostgreSQL 16 |
 | Build de produccion | correcto, 8 rutas y middleware |
 | Barrera anti-doxxing | GPS 4 campos → 0, pixeles intactos |
 | Imagenes Docker | se construyen en CI |
@@ -107,10 +110,10 @@ src/
   lib/r2.ts              Cloudflare R2 por API S3
   middleware.ts          Redirector de enlaces cortos, i18n y sesion
 supabase/
-  migrations/            Quince migraciones en orden
-  tests/                 88 aserciones de aislamiento, compuertas, limite y conectores
+  migrations/            Dieciseis migraciones en orden
+  tests/                 97 aserciones de aislamiento, compuertas, limite, conectores y triaje
 workers/                 Pipeline de medios en Python
-tests/                   141 pruebas de unidad
+tests/                   164 pruebas de unidad
 docs/                    Arquitectura, instalacion, base de datos, pruebas, despliegue
 Dockerfile               Imagen del panel (Next standalone)
 workers/Dockerfile       Imagen de los workers de medios (con FFmpeg)
@@ -120,10 +123,10 @@ docker-compose.yml       Orquestacion para VPS propio
 
 ## Siguiente entrega
 
-1. **Primera conexion real a Dropbox.** Nada de la integracion se ha ejecutado
-   contra la API: el entorno de desarrollo no alcanza internet.
-2. **Pantalla de triaje** para los archivos que quedan sin asignar.
-3. **Google Drive**, en cuanto avance el tramite de verificacion.
+1. **Primera conexion real**, a Dropbox y a Drive. Nada de la integracion se ha
+   ejecutado contra las APIs: el entorno de desarrollo no alcanza internet.
+2. **Tramite de verificacion de Google** para el alcance `drive.readonly`.
+3. **Modulo 5**: runners de publicacion a Telegram, X, Reddit y Bluesky.
 4. **Conectar un proveedor de IA real** al generador de textos.
 
 El Modulo 5 (runners de publicacion a Telegram, X, Reddit y Bluesky) sigue
