@@ -7,8 +7,8 @@ las agrega.
 |---|---|---|
 | `linters` | ESLint sobre todo el proyecto | `npm run lint` |
 | `typescript` | `tsc --noEmit` en modo estricto | `npm run typecheck` |
-| `unidad` | 164 casos: Hard Rule, cifrado, limite, textos, conectores y triaje | `npm test` |
-| `aislamiento RLS` | 97 aserciones contra PostgreSQL real | `npm run test:rls` |
+| `unidad` | 206 casos: Hard Rule, cifrado, limite, textos, conectores y publicacion | `npm test` |
+| `aislamiento RLS` | 116 aserciones contra PostgreSQL real | `npm run test:rls` |
 | `build` | Compilacion de produccion de Next | `npm run build` |
 | `workers python` | Sintaxis y la barrera anti-doxxing | `python workers/verificar_sanitizacion.py` |
 | `imagenes docker` | Construye las tres imagenes y valida el compose | `docker compose build` |
@@ -58,6 +58,14 @@ lo revisa: el material de una modelo termina publicado en la cuenta de otra. Por
 eso el enrutado es codigo puro, sin base ni red, y por eso ante dos perfiles que
 normalizan igual se niega a adivinar.
 
+**La clasificacion de fallos de publicacion** (42 casos) importa porque cada
+clase de fallo pide lo contrario de la otra: un 429 quiere esperar lo que la
+plataforma dijo, un 401 quiere parar del todo, un 400 no quiere reintento
+ninguno. Tratarlos igual convierte una incidencia menor en una cuenta baneada, y
+eso no se descubre hasta que ya paso. Las pruebas cubren los dos formatos de
+`Retry-After`, el `retry_after` que Telegram manda en el cuerpo, y que la espera
+calculada nunca quede por debajo de lo pedido.
+
 **El RLS** es la unica pieza cuyo fallo no tiene vuelta atras. Si una politica
 esta mal, el material privado de una modelo aparece en el panel de otra agencia,
 y eso ya no se deshace. Las pruebas no se limitan a comprobar que cada usuario ve
@@ -97,6 +105,8 @@ esperar una excepcion. Comprobarlo con un `assert_rejected` daria un falso verde
   enrutado, el programador, el triaje, el estado de OAuth2, el filtro de tipos y
   el recorrido de la cola; el intercambio de tokens, el listado y la descarga
   siguen sin comprobar contra los proveedores.
+- **Nada se ha publicado en Telegram de verdad.** Las pruebas simulan la Bot API
+  con un `fetch` sustituido; el envio real sigue sin comprobar.
 - **El panel de triaje no tiene pruebas de navegador.** Lo probado de esa
   pantalla es su logica —validacion del lote, tope, repetidos, resumen— y sus
   garantias en la base: que un editor asigne dentro de su agencia, que no se

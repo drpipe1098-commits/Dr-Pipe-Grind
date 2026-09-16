@@ -121,7 +121,23 @@ preguntar.
     primero, una cuenta que ya autorizo antes no recibe refresh token y la
     conexion nace muerta sin ningun error visible.
 
-21. **Una tabla nueva nace SIN privilegios para `authenticated`.** El
+21. **El publicador solo acepta `PublishableCaption`.** El worker vuelve a
+    validar el texto justo antes de enviarlo, porque en la base es una cadena
+    corriente. No es un tramite: entre programar y publicar pueden haber cambiado
+    los destinos verificados.
+
+22. **Un 401 suspende el perfil en esa red, no solo esa publicacion.** Encadenar
+    peticiones con credenciales muertas es el patron que acaba en baneo. Un 429
+    NO suspende: es pasajero.
+
+23. **Un 429 no gasta intento.** `defer_job` decrementa `attempts` a proposito.
+    Contarlo haria que una racha de limites diera el trabajo por muerto sin
+    haberlo intentado de verdad.
+
+24. **Nunca se espera menos de lo que pidio la plataforma.** El margen del
+    backoff se suma, jamas se resta.
+
+25. **Una tabla nueva nace SIN privilegios para `authenticated`.** El
     `grant ... on all tables` de la migracion 000900 solo alcanzo a las que
     existian entonces; el sintoma es un "permission denied" que no menciona el
     RLS por ningun lado. La migracion 001200 dejo puesto un
@@ -141,8 +157,8 @@ docker ────┘
 ```
 
 `rls` levanta un PostgreSQL 16 de servicio, aplica el arranque de auth que
-reproduce lo que Supabase da de fabrica, corre las dieciseis migraciones y ejecuta las
-97 aserciones.
+reproduce lo que Supabase da de fabrica, corre las diecisiete migraciones y ejecuta las
+116 aserciones.
 
 La compuerta `docker` construye las dos imagenes de verdad. Existe porque el
 despliegue es por contenedores: un Dockerfile roto no se descubriria al hacer
@@ -163,6 +179,9 @@ merge sino al intentar desplegar.
 | `src/lib/connectors/routing.ts` | Enrutado hibrido, codigo puro |
 | `src/lib/connectors/triage.ts` | Reglas del lote de asignacion |
 | `src/workers/ingest/scheduler.ts` | Que conexiones toca escanear |
+| `src/lib/publishing/errors.ts` | Clasificacion de fallos y espera; codigo puro |
+| `src/lib/publishing/registry.ts` | Registro de destinos; obliga a tenerlos todos |
+| `src/workers/publish/` | Worker de publicacion (Node) |
 | `src/lib/connectors/connection.ts` | Unico camino de entrada y salida de los tokens de nube |
 | `src/workers/ingest/` | Worker de ingesta en Node |
 | `tsconfig.workers.json` | Sustituye `server-only` para ejecutar fuera de Next |
@@ -184,7 +203,7 @@ merge sino al intentar desplegar.
 | 2 — Ingesta y vault | Completo: subidas, Dropbox, Drive, triaje y escaneo automatico. Falta ejecutarlo contra las APIs reales |
 | 3 — Pipeline de medios | Workers escritos; solo la sanitizacion EXIF esta verificada |
 | 4 — Hard Rule | Motor y validador de textos completos y probados. Falta conectar un proveedor de IA real |
-| 5 — Distribucion | Modelado en la base; **ningun runner implementado** |
+| 5 — Distribucion | Motor completo con Telegram y webhook. X, Reddit y Bluesky registrados sin implementar |
 | 6 — Enlaces y trafico | Acortador y analitica funcionando. Falta el panel de metricas |
 | 7 — Finanzas | Esquema y vista de la modelo. Falta la gestion desde el estudio |
 
@@ -228,3 +247,6 @@ merge sino al intentar desplegar.
   registrado, no se descarga nada) pero no es instantaneo.
 - **El panel de triaje no tiene pruebas de navegador.** Su logica y sus garantias
   en la base si estan cubiertas; el renderizado y la seleccion, no.
+- **Nada se ha publicado en Telegram de verdad.** Las pruebas simulan la Bot API.
+- **Falta la pantalla para levantar suspensiones.** La politica RLS ya deja
+  hacerlo al estudio; la vista no existe, asi que hoy habria que tocarlo a mano.

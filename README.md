@@ -9,7 +9,7 @@ Contexto durable en `AGENTS.md` y `docs/`.
 
 ---
 
-## Estado: Sprint 2, Fases 3-5 — Ecosistema de ingesta completo
+## Estado: Sprint 3, Fase 6 — Motor de publicacion
 
 Lo que existe y esta verificado:
 
@@ -49,6 +49,11 @@ Lo que existe y esta verificado:
   resolver, agrupados por la carpeta de origen.
 - **Escaneo automatico.** Programador dentro del worker, con cadencia por
   conexion y un indice en la base que impide escaneos duplicados entre replicas.
+- **Motor de publicacion (Modulo 5).** Worker en Node con despachador propio,
+  publicadores de Telegram y webhook generico, y clasificacion estricta de
+  fallos: el 429 respeta `Retry-After` sin gastar intento, y el 401 suspende los
+  envios de ese perfil en esa red para no encadenar peticiones que acaban en
+  baneo. X, Reddit y Bluesky quedan registrados sin implementar.
 
 ### Validacion
 
@@ -56,8 +61,8 @@ Lo que existe y esta verificado:
 |---|---|
 | ESLint | limpio |
 | TypeScript estricto | limpio |
-| Unidad (Hard Rule, cifrado, limite, textos, conectores) | 164/164 |
-| Aislamiento RLS, limite, conectores, triaje y cola | 97/97 contra PostgreSQL 16 |
+| Unidad (Hard Rule, cifrado, limite, textos, conectores, publicacion) | 206/206 |
+| Aislamiento RLS, conectores, triaje, cola y publicacion | 116/116 contra PostgreSQL 16 |
 | Build de produccion | correcto, 8 rutas y middleware |
 | Barrera anti-doxxing | GPS 4 campos → 0, pixeles intactos |
 | Imagenes Docker | se construyen en CI |
@@ -101,8 +106,10 @@ src/
   app/api/uploads/       Emision de URLs prefirmadas
   lib/scheduling/        Motor Hard Rule (codigo puro, sin dependencias)
   lib/captions/          Validador de textos y tuberia del Modulo 4
-  lib/connectors/        Dropbox, enrutado, ciclo de vida de conexiones
+  lib/connectors/        Dropbox, Drive, enrutado, ciclo de vida de conexiones
+  lib/publishing/        Publicadores, clasificacion de fallos y espera
   workers/ingest/        Worker de ingesta desde la nube (Node)
+  workers/publish/       Worker de publicacion (Node)
   lib/crypto/            Cifrado AES-256-GCM de credenciales
   lib/credentials.ts     Unico camino de entrada y salida de los tokens
   lib/rate-limit.ts      Ventana fija y hash de IP
@@ -110,23 +117,25 @@ src/
   lib/r2.ts              Cloudflare R2 por API S3
   middleware.ts          Redirector de enlaces cortos, i18n y sesion
 supabase/
-  migrations/            Dieciseis migraciones en orden
-  tests/                 97 aserciones de aislamiento, compuertas, limite, conectores y triaje
+  migrations/            Diecisiete migraciones en orden
+  tests/                 116 aserciones de aislamiento, compuertas, conectores y publicacion
 workers/                 Pipeline de medios en Python
-tests/                   164 pruebas de unidad
+tests/                   206 pruebas de unidad
 docs/                    Arquitectura, instalacion, base de datos, pruebas, despliegue
 Dockerfile               Imagen del panel (Next standalone)
 workers/Dockerfile       Imagen de los workers de medios (con FFmpeg)
-workers/ingest.Dockerfile Imagen del worker de ingesta (Node, sin FFmpeg)
+workers/node.Dockerfile  Imagen de los workers de Node (ingesta y publicacion)
 docker-compose.yml       Orquestacion para VPS propio
 ```
 
 ## Siguiente entrega
 
-1. **Primera conexion real**, a Dropbox y a Drive. Nada de la integracion se ha
-   ejecutado contra las APIs: el entorno de desarrollo no alcanza internet.
-2. **Tramite de verificacion de Google** para el alcance `drive.readonly`.
-3. **Modulo 5**: runners de publicacion a Telegram, X, Reddit y Bluesky.
+1. **Fase 7**: paneles de analitica y finanzas (`/studio/analytics`,
+   `/studio/finances`).
+2. **Primera publicacion real** en Telegram, y primera conexion real a Dropbox y
+   Drive. Nada se ha ejecutado contra las APIs: el entorno de desarrollo no
+   alcanza internet.
+3. **X, Reddit y Bluesky**, que hoy estan registrados sin implementar.
 4. **Conectar un proveedor de IA real** al generador de textos.
 
 El Modulo 5 (runners de publicacion a Telegram, X, Reddit y Bluesky) sigue

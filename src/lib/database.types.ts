@@ -37,6 +37,19 @@ export type JobStatus = 'pending' | 'claimed' | 'done' | 'failed' | 'dead';
 export type ComplianceStatus = 'pending' | 'verified' | 'expired' | 'rejected';
 export type PayoutStatus = 'pending' | 'approved' | 'paid' | 'disputed';
 export type CloudProvider = 'google_drive' | 'dropbox';
+
+export type PublishSuspensionRow = {
+  id: string;
+  organization_id: string;
+  profile_id: string;
+  platform: Platform;
+  reason: string;
+  last_error: string | null;
+  suspended_at: string;
+  until: string | null;
+  lifted_at: string | null;
+  lifted_by: string | null;
+};
 export type CloudConnectionStatus = 'active' | 'expired' | 'revoked' | 'error';
 export type CloudItemStatus =
   | 'discovered'
@@ -163,6 +176,8 @@ export type ScheduleRow = {
   tracking_link_id: string | null;
   attempts: number;
   last_error: string | null;
+  external_post_id: string | null;
+  external_url: string | null;
   created_by: string | null;
   created_at: string;
 }
@@ -331,6 +346,7 @@ export type Database = {
       jobs: { Row: JobRow; Insert: Partial<JobRow>; Update: Partial<JobRow>; Relationships: [] };
       cloud_connections: { Row: CloudConnectionRow; Insert: Partial<CloudConnectionRow>; Update: Partial<CloudConnectionRow>; Relationships: [] };
       cloud_ingest_items: { Row: CloudIngestItemRow; Insert: Partial<CloudIngestItemRow>; Update: Partial<CloudIngestItemRow>; Relationships: [] };
+      publish_suspensions: { Row: PublishSuspensionRow; Insert: Partial<PublishSuspensionRow>; Update: Partial<PublishSuspensionRow>; Relationships: [] };
       platform_credentials: { Row: PlatformCredentialRow; Insert: Partial<PlatformCredentialRow>; Update: Partial<PlatformCredentialRow>; Relationships: [] };
     };
     Views: { [_ in never]: never };
@@ -342,6 +358,18 @@ export type Database = {
       claim_jobs: {
         Args: { p_worker: string; p_batch?: number; p_types?: JobType[] | null };
         Returns: JobRow[];
+      };
+      defer_job: {
+        Args: { p_job_id: string; p_seconds: number; p_error?: string | null };
+        Returns: undefined;
+      };
+      kill_job: {
+        Args: { p_job_id: string; p_error: string };
+        Returns: undefined;
+      };
+      is_publishing_suspended: {
+        Args: { p_profile: string; p_platform: Platform };
+        Returns: boolean;
       };
       complete_job: {
         Args: { p_job_id: string; p_success: boolean; p_error?: string | null };

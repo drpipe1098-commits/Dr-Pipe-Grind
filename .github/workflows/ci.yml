@@ -168,11 +168,11 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Construir la imagen del worker de ingesta
+      - name: Construir la imagen de los workers de Node
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./workers/ingest.Dockerfile
+          file: ./workers/node.Dockerfile
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max

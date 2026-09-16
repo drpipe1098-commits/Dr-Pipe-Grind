@@ -115,6 +115,34 @@ export async function uploadStream(input: {
 }
 
 /**
+ * Descarga un objeto entero a memoria.
+ *
+ * Lo necesitan los destinos que suben por multipart, como Telegram. Lleva tope
+ * obligatorio y no por prudencia general: sin el, un video de dos gigas tumba el
+ * contenedor del worker y con el toda la cola de publicacion.
+ */
+export async function getObjectBytes(key: string, maxBytes: number): Promise<Uint8Array> {
+  const env = serverEnv();
+  const response = await r2Client().send(
+    new GetObjectCommand({ Bucket: env.R2_BUCKET, Key: key }),
+  );
+
+  const length = response.ContentLength ?? 0;
+  if (length > maxBytes) {
+    throw new Error(
+      `El objeto ${key} pesa ${length} bytes y el tope para esta operacion es ${maxBytes}.`,
+    );
+  }
+
+  const body = response.Body;
+  if (body === undefined) {
+    throw new Error(`El objeto ${key} no tiene contenido.`);
+  }
+
+  return new Uint8Array(await body.transformToByteArray());
+}
+
+/**
  * Borra un objeto.
  *
  * Lo necesita la ingesta cuando descubre, ya subido el archivo, que su contenido

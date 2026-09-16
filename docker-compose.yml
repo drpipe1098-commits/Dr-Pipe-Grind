@@ -94,7 +94,7 @@ services:
   ingest:
     build:
       context: .
-      dockerfile: workers/ingest.Dockerfile
+      dockerfile: workers/node.Dockerfile
     restart: unless-stopped
     environment:
       # Habla con la base por PostgREST, no por conexion directa: los
@@ -123,6 +123,42 @@ services:
         limits:
           # Mueve bytes, no los procesa: el archivo va de Dropbox a R2 en flujo,
           # sin caber entero en memoria. No necesita el margen del worker de medios.
+          cpus: '1.0'
+          memory: 768M
+
+  publish:
+    # Misma imagen que `ingest`, distinto command. Va aparte porque las dos
+    # cargas son opuestas: la ingesta mueve gigabytes durante minutos y la
+    # publicacion son peticiones cortas con hora marcada. Juntas, una descarga
+    # larga retrasaria un teaser programado para las diez de la noche.
+    build:
+      context: .
+      dockerfile: workers/node.Dockerfile
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      NEXT_PUBLIC_SHORT_LINK_BASE_URL: ${NEXT_PUBLIC_SHORT_LINK_BASE_URL}
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_REGION: ${R2_REGION:-auto}
+      # Descifra los tokens de las plataformas de destino.
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      UPLOAD_LINK_SECRET: ${UPLOAD_LINK_SECRET}
+      CLICK_IP_SALT: ${CLICK_IP_SALT}
+      PUBLISH_WORKER_BATCH_SIZE: ${PUBLISH_WORKER_BATCH_SIZE:-3}
+      PUBLISH_WORKER_POLL_SECONDS: ${PUBLISH_WORKER_POLL_SECONDS:-15}
+      PUBLISH_DISPATCH_SECONDS: ${PUBLISH_DISPATCH_SECONDS:-60}
+    command: ['sh', '-c', 'WORKER_NAME=publish-$$(hostname) npx tsx --tsconfig tsconfig.workers.json src/workers/publish/index.ts']
+    deploy:
+      resources:
+        limits:
+          # Telegram sube por multipart, asi que un video de 50 MB pasa por
+          # memoria. El tope lo acota; mas alla de eso no procesa nada.
           cpus: '1.0'
           memory: 768M
 
