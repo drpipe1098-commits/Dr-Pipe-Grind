@@ -55,3 +55,33 @@ Cuando un campo falle en un portal real:
 4. `npm test`.
 
 Los casos con esperado `null` son la parte más importante de ese archivo: son los que garantizan que POSTULA jamás toque una contraseña ni un medio de pago.
+
+
+---
+
+## Campos que pertenecen a una fila de experiencia
+
+El motor de `matcher.js` decide campo por campo y **no sabe dónde está**. Eso
+alcanza para los datos que la persona tiene una sola vez, y se rompe en el
+historial laboral, donde «Nombre del cargo» aparece una vez por empleo.
+
+`extension/content/experiencia.js` resuelve esa parte y se consulta **antes**
+que el matcher general:
+
+1. reconoce los campos de fila (`cargo`, `empresa`, `desde`, `hasta`,
+   `funciones`) mirando **solo las señales propias del campo**, nunca el texto
+   cercano: dentro de un bloque, el texto cercano contiene los rótulos de
+   todos los demás campos y cualquiera parecería cualquiera;
+2. los agrupa en bloques. Un bloque es el ancestro más pequeño que contiene al
+   menos dos clases distintas y **como mucho un cargo y una empresa**, porque
+   un bloque es un empleo;
+3. empareja cada bloque con su entrada de `experiencia[]`, primero por lo que
+   el formulario ya tenga escrito (empresa, luego fechas) y después por orden.
+
+Los campos de un bloque quedan fuera del alcance del matcher general **aunque
+no se hayan podido llenar**. Esa es la garantía que impide que `Cargo actual`
+—que sí es el titular profesional— se confunda con el cargo de un empleo
+pasado.
+
+Para agregar un rótulo nuevo del historial laboral se toca `CAMPOS_DE_FILA` en
+`experiencia.js`, no `PATRONES` en `matcher.js`.

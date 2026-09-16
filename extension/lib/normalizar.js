@@ -38,5 +38,40 @@
       || textoNormalizado.includes(objetivo);
   }
 
-  raiz.POSTULA_Normalizar = { normalizar, unir, contiene };
+  /**
+   * Formas jurídicas: no identifican a nadie y se escriben de cualquier
+   * manera. «Ejemplo SAS», «Ejemplo S.A.S», «Ejemplo S.A.S.» y «Ejemplo
+   * S A S» son la misma empresa, y hay que poder reconocerlo para no
+   * duplicarla ni confundirla con otra.
+   */
+  const FORMAS_JURIDICAS = [
+    'sas', 'sa', 'ltda', 'limitada', 'eu', 'sca', 'cia', 'compania',
+    'inc', 'llc', 'ltd', 'corp', 'srl', 'spa', 'bic', 'group', 'grupo',
+    's', 'a', 'c', 'u', 'e', 'en', 'y'
+  ];
+
+  /**
+   * El nombre de una empresa reducido a lo que de verdad la identifica.
+   * Nunca devuelve vacío: una empresa que se llama como una forma jurídica
+   * conserva su nombre.
+   */
+  function nucleoDeEmpresa(nombre) {
+    const palabras = normalizar(nombre).split(' ').filter(Boolean);
+    while (palabras.length > 1 && FORMAS_JURIDICAS.includes(palabras[palabras.length - 1])) {
+      palabras.pop();
+    }
+    return palabras.join(' ');
+  }
+
+  /** ¿Dos nombres de empresa se refieren a la misma? */
+  function mismaEmpresa(unNombre, otroNombre) {
+    const una = nucleoDeEmpresa(unNombre);
+    const otra = nucleoDeEmpresa(otroNombre);
+    if (!una || !otra) return false;
+    return una === otra || una.includes(otra) || otra.includes(una);
+  }
+
+  raiz.POSTULA_Normalizar = {
+    normalizar, unir, contiene, nucleoDeEmpresa, mismaEmpresa, FORMAS_JURIDICAS
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

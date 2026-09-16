@@ -187,4 +187,24 @@ if (revisados.error) {
   });
 }
 
+// --- 10. Las pruebas inyectan exactamente lo que inyecta la extensión ---
+//
+// La lista de archivos a inyectar está en popup.js y se repite en las
+// pruebas. Al agregar content/experiencia.js se actualizó una y no la otra,
+// y la prueba de navegador falló entera con 31 errores que no decían la
+// causa. Esto lo vuelve imposible de repetir en silencio.
+function listaDeArchivos(texto) {
+  const bloque = texto.match(/\[([^\]]*?(?:lib|content)\/[^\]]*?)\]/s);
+  if (!bloque) return [];
+  return (bloque[1].match(/['"]([^'"]*(?:lib|content)\/[^'"]+)['"]/g) || [])
+    .map((entrada) => entrada.replace(/['"]/g, '').replace(/^extension\//, ''));
+}
+
+const inyectaPopup = listaDeArchivos(leer('extension/popup.js'));
+const inyectaNavegador = listaDeArchivos(leer('tests/navegador-contract.mjs'));
+
+c.exigir(inyectaPopup.length > 0, 'no se pudo leer la lista de archivos de popup.js');
+c.igual(inyectaNavegador, inyectaPopup,
+  'la prueba de navegador debe inyectar los mismos archivos, en el mismo orden, que la extensión');
+
 c.cerrar();

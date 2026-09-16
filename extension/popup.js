@@ -10,6 +10,7 @@ const ARCHIVOS = [
   'lib/normalizar.js',
   'lib/perfil.js',
   'content/matcher.js',
+  'content/experiencia.js',
   'content/autofill.js'
 ];
 
